@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package obj_store;
+
+import "auth.proto";
+
+enum HashType {
+    SHA256 = 1;
+    SHA512 = 2;
+    SHA3_256 = 3;
+    SHA3_512 = 4;
+};
+
+enum ResultStatus {
+    OK = 1;
+    FAILED = 2;
+    CANCELLED = 3;
+    TIMEOUT = 4;
+    OVERLOAD = 5;
+};
+
+service ObjStore{
+  rpc Write(WriteRequest) returns (Result);
+  rpc Read(ReadRequest) returns (ContentResult);
+  rpc Hash(HashRequest) returns (ContentResult);
+  rpc Delete(DeleteRequest) returns (Result);
+};
+
+message WriteRequest {
+  TaskHeader hdr = 1;
+  bytes id = 2;
+  repeated string paths = 3; // required when creating file
+  int64 offset = 4;  // -1 = end of file
+  bytes data = 5;
+};
+
+message ReadRequest {
+  TaskHeader hdr = 1;
+  bytes id = 2;
+  int64 offset = 3; // -1 = end of file
+  int64 data_len = 4;
+};
+
+message HashRequest {
+  TaskHeader hdr = 1;
+  bytes id = 2;
+  HashType hash_type = 3;
+  int64 offset = 4; // -1 = end of file
+  int64 data_len = 5; // default = to file end
+};
+
+message DeleteRequest {
+  TaskHeader hdr = 1;
+  bytes id = 2;
+};
+
+message Result {
+  ResultStatus status = 1;
+};
+
+message ContentResult {
+  ResultStatus status = 1;
+  bytes content = 2;
+};

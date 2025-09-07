@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package obj_store;
+
+message TaskHeader {
+    bytes auth_id = 1;
+};
