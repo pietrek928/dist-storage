@@ -1,3 +1,9 @@
+**/proto/cc
+**/proto/py
+**/proto/go
+
 **/*Cache.txt
 **/CMakeFiles
 **/*.cmake
+
+**/Makefile

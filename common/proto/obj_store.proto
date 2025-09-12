@@ -5,18 +5,10 @@ package obj_store;
 import "auth.proto";
 
 enum HashType {
-    SHA256 = 1;
-    SHA512 = 2;
-    SHA3_256 = 3;
-    SHA3_512 = 4;
-};
-
-enum ResultStatus {
-    OK = 1;
-    FAILED = 2;
-    CANCELLED = 3;
-    TIMEOUT = 4;
-    OVERLOAD = 5;
+    SHA256 = 0;
+    SHA512 = 1;
+    SHA3_256 = 2;
+    SHA3_512 = 3;
 };
 
 service ObjStore{
@@ -27,7 +19,7 @@ service ObjStore{
 };
 
 message WriteRequest {
-  TaskHeader hdr = 1;
+  auth.TaskHeader hdr = 1;
   bytes id = 2;
   repeated string paths = 3; // required when creating file
   int64 offset = 4;  // -1 = end of file
@@ -35,14 +27,14 @@ message WriteRequest {
 };
 
 message ReadRequest {
-  TaskHeader hdr = 1;
+  auth.TaskHeader hdr = 1;
   bytes id = 2;
   int64 offset = 3; // -1 = end of file
   int64 data_len = 4;
 };
 
 message HashRequest {
-  TaskHeader hdr = 1;
+  auth.TaskHeader hdr = 1;
   bytes id = 2;
   HashType hash_type = 3;
   int64 offset = 4; // -1 = end of file
@@ -50,15 +42,13 @@ message HashRequest {
 };
 
 message DeleteRequest {
-  TaskHeader hdr = 1;
+  auth.TaskHeader hdr = 1;
   bytes id = 2;
 };
 
-message Result {
-  ResultStatus status = 1;
-};
+message Result { auth.OperationResult result = 1; };
 
 message ContentResult {
-  ResultStatus status = 1;
+  auth.OperationResult result = 1;
   bytes content = 2;
 };
