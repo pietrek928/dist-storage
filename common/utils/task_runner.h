@@ -17,74 +17,87 @@ enum TaskStatus {
     OVERLOAD
 };
 
-class TaskContainer {
-    public:
-
+typedef struct {
     int priority;
     double timestamp;
     TaskStatus status;
+} TaskInfo;
 
-    TaskContainer(int priority, double timestamp, TaskStatus status)
-        : priority(priority), timestamp(timestamp), status(status) {}
+class TaskContainerBase {
+    TaskInfo info;
+    public:
+
+    auto get_priority() const {
+        return info.priority;
+    }
+
+    auto get_timestamp() const {
+        return info.priority;
+    }
+
+    auto get_status() const {
+        return info.status;
+    }
+
+    TaskContainerBase(TaskInfo info): info(info) {}
 
     virtual void run() = 0;
 
-    virtual ~TaskContainer() = default;
+    virtual ~TaskContainerBase() = default;
 };
 
 template <typename Tf>
-class TaskContainerLambda : public TaskContainer {
+class TaskContainerLambda: TaskContainerBase {
     public:
 
-    Tf lambda;
+    std::unique_ptr<Tf> lambda;
 
-    TaskContainerLambda(int priority, double timestamp, TaskStatus status, Tf &&lambda)
-        : TaskContainer(priority, timestamp, status), lambda(lambda) {}
+    TaskContainerLambda(TaskInfo info, Tf &&lambda)
+    : TaskContainerBase(info), lambda(std::make_unique<Tf>(std::move(lambda))) {}
 
-    void run() override {
-        lambda(status);
+    void run() {
+        lambda(get_status());
     }
 };
 
 struct TaskContainerNewestFirst {
-    bool operator()(const TaskContainer *a, const TaskContainer *b) const {
-        if (a->timestamp == b->timestamp) {
-            return a->priority < b->priority;
+    bool operator()(const TaskContainerBase *a, const TaskContainerBase *b) const {
+        if (a->get_timestamp() == b->get_timestamp()) {
+            return a->get_priority() < b->get_priority();
         }
-        return a->timestamp < b->timestamp;
+        return a->get_timestamp() < b->get_timestamp();
     }
 };
 
 struct TaskContainerOldestFirst {
-    bool operator()(const TaskContainer *a, const TaskContainer *b) const {
-        if (a->timestamp == b->timestamp) {
-            return a->priority < b->priority;
+    bool operator()(const TaskContainerBase *a, const TaskContainerBase *b) const {
+        if (a->get_timestamp() == b->get_timestamp()) {
+            return a->get_priority() < b->get_priority();
         }
-        return a->timestamp > b->timestamp;
+        return a->get_timestamp() > b->get_timestamp();
     }
 };
 
+template<class TaskContainer>
 class TaskRunner {
-    std::multiset<std::unique_ptr<TaskContainer>, TaskContainerNewestFirst> tasks;
+    std::multiset<TaskContainer> tasks;
     std::vector<std::thread> threads;
     std::mutex lock;
     std::condition_variable cv;
     bool running = false;
 
-    std::unique_ptr <TaskContainer> pop_unsafe() {
-        if (tasks.empty()) {
-            return NULL;
-        }
+    TaskContainer &&pop_unsafe() {
         return std::move(tasks.extract(tasks.begin()).value());
     }
 
     void task_loop() {
-        std::unique_ptr<TaskContainer> task = NULL;
+        TaskContainer task;
         while (running || !tasks.empty()) {
             {
                 std::unique_lock<std::mutex> guard(lock);
-                task = pop_unsafe();
-                if (!task) {
+                if (!tasks.empty()) {
+                    task = pop_unsafe();
+                } else {
                     cv.wait(guard);
                     task = pop_unsafe();
                     if (!task) {
@@ -110,10 +123,10 @@ class TaskRunner {
         start_threads(num_threads);
     }
 
-    template<typename Tf>
-    void push(int priority, double timestamp, TaskStatus status, Tf &&lambda) {
+    template<typename ...Ttask_args>
+    void push(int priority, double timestamp, TaskStatus status, Ttask_args... task_args) {
         std::unique_lock<std::mutex> guard(lock);
-        tasks.emplace(new TaskContainerLambda<Tf>(priority, timestamp, status, lambda));
+        tasks.emplace(new TaskContainer(priority, timestamp, status, task_args...));
         cv.notify_one();
     }
 

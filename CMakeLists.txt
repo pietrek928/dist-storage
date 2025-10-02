@@ -6,5 +6,6 @@ add_custom_target(proto
     COMMENT "Project protos"
 )
 include_directories(${CMAKE_SOURCE_DIR}/common/proto/cc)
+include_directories(${CMAKE_SOURCE_DIR}/common/utils)
 
 add_subdirectory(minion/obj_store)
