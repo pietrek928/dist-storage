@@ -14,6 +14,26 @@ message TaskHeader {
     repeated bytes auth_ids = 1;
 };
 
+service Limit {
+    rpc LimitSession(stream LimitRequestUnion) returns(stream LimitRequestUnion);
+};
+
+message LimitRequestUnion {
+  oneof v {
+    BillRequest request = 1;
+    BillAppend append = 2;
+    BillOverride overwrite = 3;
+    BillFinish finish = 4;
+  };
+};
+
+message LimitResponseUnion {
+  oneof v {
+    OperationResult result = 1;
+    AuthResult auth = 2;
+  };
+};
+
 // Inits billing and returns aut paths - also confirms auth
 message BillRequest {
     repeated bytes auth_ids = 1;
@@ -25,7 +45,9 @@ message AuthDescr {
     repeated string auth_keys = 2;
 };
 
-message BillResponse { repeated AuthDescr auths = 1; };
+message AuthResult {
+    repeated AuthDescr auths = 1;
+};
 
 message BillAppend { map<string, double> bill_items = 1; };
 message BillOverride { map<string, double> bill_items = 1; };

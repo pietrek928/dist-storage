@@ -36,6 +36,7 @@ class WriteHandler : public GRPCSimpleHandler<
 
         // TODO: auth
         // TODO: save object auth paths
+        // TODO: report quota
         auto path = obj_path(id);
         unique_fd fd = open(path.c_str(), O_WRONLY | O_CREAT);
         if (!fd.valid()) {
@@ -64,6 +65,7 @@ class ReadHandler : public GRPCSimpleHandler<
 
         // TODO: auth
         // TODO: object auth paths
+        // TODO: report quota
         auto path = obj_path(id);
         unique_fd fd = open(path.c_str(), O_RDONLY);
         if (!fd.valid()) {
