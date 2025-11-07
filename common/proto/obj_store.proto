@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package obj_store;
 
-import "auth.proto";
+import "resource.proto";
 
 enum HashType {
     SHA256 = 0;
@@ -19,7 +19,7 @@ service ObjStore{
 };
 
 message WriteRequest {
-  auth.TaskHeader hdr = 1;
+  resource.TaskHeader hdr = 1;
   bytes id = 2;
   repeated string paths = 3; // required when creating file
   int64 offset = 4;  // -1 = end of file
@@ -27,14 +27,14 @@ message WriteRequest {
 };
 
 message ReadRequest {
-  auth.TaskHeader hdr = 1;
+  resource.TaskHeader hdr = 1;
   bytes id = 2;
   int64 offset = 3; // -1 = end of file
   int64 data_len = 4;
 };
 
 message HashRequest {
-  auth.TaskHeader hdr = 1;
+  resource.TaskHeader hdr = 1;
   bytes id = 2;
   HashType hash_type = 3;
   int64 offset = 4; // -1 = end of file
@@ -42,13 +42,13 @@ message HashRequest {
 };
 
 message DeleteRequest {
-  auth.TaskHeader hdr = 1;
+  resource.TaskHeader hdr = 1;
   bytes id = 2;
 };
 
-message Result { auth.OperationResult result = 1; };
+message Result { resource.OperationResult result = 1; };
 
 message ContentResult {
-  auth.OperationResult result = 1;
+  resource.OperationResult result = 1;
   bytes content = 2;
 };

@@ -1,35 +1,57 @@
 #pragma once
 
 #include <grpcpp/grpcpp.h>
+#include <grpcpp/support/async_stream.h>
 
 
 class GRPCHandler {
     public:
-    grpc::ServerContext ctx;
-    int state = 0;
-
     GRPCHandler() {}
 
+    // CAUTION: this function MUST emit event or call dispose() at the end
     virtual void process(grpc::ServerCompletionQueue *cq, bool running) = 0;
     virtual ~GRPCHandler() = default;
 };
 
+class GRPCCounterHandler : public GRPCHandler {
+    std::atomic<int> counter = 0;
+    GRPCHandler *handler;
+
+    public:
+    GRPCCounterHandler() = delete;
+    GRPCCounterHandler(GRPCHandler *handler)
+        : handler(handler) {}
+
+    virtual void process(grpc::ServerCompletionQueue *cq, bool running) {
+        counter++;
+        handler->process(cq, running);
+    }
+
+    void reset() {
+        counter = 0;
+    }
+
+    int get() {
+        return counter;
+    }
+};
+
+class GRPCAllocableHandler : public GRPCHandler {
+    protected:
+    grpc::ServerContext ctx;
+    int state = 0;
+    void dispose() {
+        delete this;
+    }
+};
 
 template<class Tservice, class Trequest, class Tresult>
-class GRPCSimpleHandler : public GRPCHandler {
+class GRPCBasicHandler : public GRPCAllocableHandler {
     protected:
     Tservice *service = NULL;
     Trequest request;
     Tresult response;
     grpc::ServerAsyncResponseWriter<Tresult> responder;
-
-    public:
-    GRPCSimpleHandler(Tservice *service)
-        : service(service), responder(&ctx) {}
-    GRPCSimpleHandler(const GRPCSimpleHandler& other)
-    : GRPCSimpleHandler(other.service) {}
-    GRPCSimpleHandler(GRPCSimpleHandler&& other) = delete;
-
 
     void bind(grpc::ServerCompletionQueue *cq) {
         service->RequestWrite(&ctx, &request, &responder, cq, cq, this);
@@ -38,6 +60,18 @@ class GRPCSimpleHandler : public GRPCHandler {
     void handle_request() {
         throw std::runtime_error("not implemented");
     }
+
+    void finish() {
+        responder.Finish(response, grpc::Status::OK, this);
+        state = 12345;
+    }
+
+    public:
+    GRPCBasicHandler(Tservice *service)
+        : service(service), responder(&ctx) {}
+    GRPCBasicHandler(const GRPCBasicHandler& other)
+    : GRPCBasicHandler(other.service) {}
+    GRPCBasicHandler(GRPCBasicHandler&& other) = delete;
 
     void process(grpc::ServerCompletionQueue *cq, bool running) {
         switch(state++) {
@@ -49,11 +83,47 @@ class GRPCSimpleHandler : public GRPCHandler {
                 break;
             case 2:
                 handle_request();
-                responder.Finish(response, grpc::Status::OK, this);
+                finish();
                 break;
             default:
-                delete this;
+                dispose();
                 break;
         }
     }
+};
+
+
+template<class Tservice, class Trequest, class Tresult>
+class GRPCStreamHandler : public GRPCAllocableHandler {
+    protected:
+    Trequest request;
+    Tresult response;
+    grpc::ServerAsyncReaderWriter<Tresult, Trequest> stream;
+
+    void read() {
+        stream.Read(&request, this);
+    }
+
+    void read(GRPCHandler *handler) {
+        stream.Read(&request, handler);
+    }
+
+    void write() {
+        stream.Write(response, this);
+    }
+
+    void write(GRPCHandler *handler) {
+        stream.Write(response, handler);
+    }
+
+    void finish(grpc::Status status = grpc::Status::OK) {
+        stream.Finish(status, this);
+    }
+
+    public:
+    GRPCStreamHandler()
+        : stream(&ctx) {}
+    GRPCStreamHandler(const GRPCStreamHandler& other)
+    : GRPCStreamHandler() {}
+    GRPCStreamHandler(GRPCStreamHandler&& other) = delete;
 };

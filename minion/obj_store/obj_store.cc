@@ -5,7 +5,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include <auth.pb.h>
+#include <resource.pb.h>
 #include <grpcpp/grpcpp.h>
 #include <obj_store.pb.h>
 #include <obj_store.grpc.pb.h>
@@ -26,7 +26,7 @@ __off_t seek_offset(int fd, int64_t offset) {
 }
 
 
-class WriteHandler : public GRPCSimpleHandler<
+class WriteHandler : public GRPCBasicHandler<
     obj_store::ObjStore::AsyncService, obj_store::WriteRequest, obj_store::Result
 > {
     // TODO: error logging
@@ -40,24 +40,24 @@ class WriteHandler : public GRPCSimpleHandler<
         auto path = obj_path(id);
         unique_fd fd = open(path.c_str(), O_WRONLY | O_CREAT);
         if (!fd.valid()) {
-            response.set_result(auth::OperationResult::FAILED);
+            response.set_result(resource::OperationResult::FAILED);
             return;
         }
         if (seek_offset(fd, request.offset())) {
-            response.set_result(auth::OperationResult::FAILED);
+            response.set_result(resource::OperationResult::FAILED);
             return;
         }
 
         if (write(fd, data.data(), data.size()) != data.size()) {
-            response.set_result(auth::OperationResult::FAILED);
+            response.set_result(resource::OperationResult::FAILED);
             return;
         }
 
-        response.set_result(auth::OperationResult::OK);
+        response.set_result(resource::OperationResult::OK);
     }
 };
 
-class ReadHandler : public GRPCSimpleHandler<
+class ReadHandler : public GRPCBasicHandler<
     obj_store::ObjStore::AsyncService, obj_store::ReadRequest, obj_store::ContentResult
 > {
     void handle_request() {
@@ -69,12 +69,12 @@ class ReadHandler : public GRPCSimpleHandler<
         auto path = obj_path(id);
         unique_fd fd = open(path.c_str(), O_RDONLY);
         if (!fd.valid()) {
-            response.set_result(auth::OperationResult::FAILED);
+            response.set_result(resource::OperationResult::FAILED);
             return;
         }
 
         if (seek_offset(fd, request.offset())) {
-            response.set_result(auth::OperationResult::FAILED);
+            response.set_result(resource::OperationResult::FAILED);
             return;
         }
 
@@ -83,18 +83,18 @@ class ReadHandler : public GRPCSimpleHandler<
             std::string data(to_read, '\0');
             auto read_res = read(fd, data.data(), to_read);
             if (read_res <= 0) {
-                response.set_result(auth::OperationResult::FAILED);
+                response.set_result(resource::OperationResult::FAILED);
                 return;
             }
             data.resize(read_res);
             response.set_content(data);
         }
 
-        response.set_result(auth::OperationResult::OK);
+        response.set_result(resource::OperationResult::OK);
     }
 };
 
-class DeleteHandler : public GRPCSimpleHandler<
+class DeleteHandler : public GRPCBasicHandler<
     obj_store::ObjStore::AsyncService, obj_store::DeleteRequest, obj_store::Result
 > {
     void handle_request() {
@@ -104,11 +104,11 @@ class DeleteHandler : public GRPCSimpleHandler<
         // TODO: object auth paths
         auto path = obj_path(id);
         if (unlink(path.c_str())) {
-            response.set_result(auth::OperationResult::FAILED);
+            response.set_result(resource::OperationResult::FAILED);
             return;
         }
 
-        response.set_result(auth::OperationResult::OK);
+        response.set_result(resource::OperationResult::OK);
     }
 };
 

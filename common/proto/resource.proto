@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package resource;
+
+enum OperationResult {
+  OK = 0;
+  FAILED = 1;
+  CANCELLED = 2;
+  TIMEOUT = 3;
+  OVERLOAD = 4;
+};
+
+message TaskHeader {
+    repeated bytes auth_ids = 1;
+};
+
+service Resource {
+  rpc ResourceSession(stream ResourceRequestUnion)
+      returns (stream ResourceRequestUnion);
+};
+
+message ResourceRequestUnion {
+  oneof v {
+    ResourceRequest resourceRequest = 1;
+    BillAppend billAppend = 2;
+    BillOverride billOverwrite = 3;
+    ResourceFinish resourceFinish = 4;
+  };
+};
+
+message ResourceResponseUnion {
+  oneof v {
+    OperationResult result = 1;
+    AuthResult auth = 2;
+  };
+};
+
+// Inits billing and returns auth paths - also confirms auth
+message ResourceRequest {
+  repeated bytes authIds = 1;
+  map<string, double> billItems = 2;
+};
+
+message AuthDescr {
+    bytes authId = 1;
+    repeated string authKeys = 2;
+};
+
+message AuthResult {
+    repeated AuthDescr auths = 1;
+};
+
+message BillAppend { map<string, double> billItems = 1; };
+message BillOverride { map<string, double> billItems = 1; };
+
+// send BillFinish to confirm billing operation finish
+message ResourceFinish { OperationResult result = 1; };
