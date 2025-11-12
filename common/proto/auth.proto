@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package auth;
+
+import "resource.proto";
+
+enum CheckSessionStatus {
+  OK = 0;
+  UNAUTHORIZED = 1;
+  EXPIRED = 2;
+  FAILED = 3;
+};
+
+service Auth {
+  rpc CheckSession(CheckSessionRequest) returns (CheckSessionResult);
+};
+
+message CheckSessionRequest {
+  resource.TaskHeader hdr = 1;
+  bytes sessionId = 2;
+};
+
+message CheckSessionResult {
+  CheckSessionStatus status = 1;
+  repeated resource.KeySet auths = 2;
+};

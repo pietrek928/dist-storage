@@ -10,14 +10,31 @@ enum OperationResult {
   OVERLOAD = 4;
 };
 
+message KeySet { repeated string keys = 1; };
+
+message ResourceKeys {
+  KeySet required_keys = 1;
+  repeated KeySet keys_or = 2;
+};
+
 message TaskHeader {
-    repeated bytes auth_ids = 1;
+  bytes signerId = 1;
+  bytes signature = 2;
+  bytes sessionData = 3;
+};
+
+message SessionData {
+  repeated KeySet permissions = 1;
+  repeated bytes billingIds = 2;
+  int64 end_timestamp_s = 3;
 };
 
 service Resource {
   rpc ResourceSession(stream ResourceRequestUnion)
-      returns (stream ResourceRequestUnion);
+      returns (stream OperationResult);
 };
+
+message OperationResult { OperationResult result = 1; };
 
 message ResourceRequestUnion {
   oneof v {
@@ -28,30 +45,15 @@ message ResourceRequestUnion {
   };
 };
 
-message ResourceResponseUnion {
-  oneof v {
-    OperationResult result = 1;
-    AuthResult auth = 2;
-  };
-};
-
 // Inits billing and returns auth paths - also confirms auth
 message ResourceRequest {
-  repeated bytes authIds = 1;
-  map<string, double> billItems = 2;
-};
-
-message AuthDescr {
-    bytes authId = 1;
-    repeated string authKeys = 2;
-};
-
-message AuthResult {
-    repeated AuthDescr auths = 1;
+  TaskHeader hdr = 1;
+  repeated bytes billingIds = 2;
+  map<string, double> billItems = 3;
 };
 
 message BillAppend { map<string, double> billItems = 1; };
 message BillOverride { map<string, double> billItems = 1; };
 
-// send BillFinish to confirm billing operation finish
+// send ResourceFinish to confirm billing operation finish
 message ResourceFinish { OperationResult result = 1; };

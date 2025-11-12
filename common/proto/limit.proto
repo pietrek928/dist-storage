@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package limit;
+
+enum LimitResult {
+  OK = 0;
+  FAILED = 1;
+  NOT_ENOUGH = 2;
+  ID_NOT_FOUND = 3;
+  RESOURCE_NOT_FOUND = 4;
+};
+
+service Limit {
+    rpc Reserve(LimitReserve) returns (LimitReserveResponse);
+    rpc Commit(LimitCommit) returns (LimitCommitResponse);
+};
+
+message LimitReserve {
+  bytes billingId = 1;
+  map<string, double> billItems = 2;
+}
+
+message LimitReserveResponse {
+    LimitResult result = 1;
+    bytes transactionId = 2;
+}
+
+message LimitCommit {
+  bytes id = 1;  // transaction or billing id
+  map<string, double> billItems = 2;
+}
+
+message LimitCommitResponse {
+    LimitResult result = 1;
+};
