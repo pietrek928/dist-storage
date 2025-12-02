@@ -51,5 +51,5 @@ size_t get_next_stage_pos(
     size_t stage_pos, int stage, const size_t *stage_size_steps
 ) {
     size_t nitems = get_stage_pos_items_count(stage_pos, stage, stage_size_steps);
-    return (nitems-1) * stage_size_steps[stage];
+    return nitems * stage_size_steps[stage];
 }

@@ -12,6 +12,8 @@
 #include "unique_fd.h"
 
 
+typedef unsigned char byte;
+
 int get_open_flags(bool readonly, bool create);
 int get_prot_flags(bool readonly);
 size_t read_data(
@@ -26,7 +28,7 @@ unique_fd init_data_file(const char *fname, bool readonly, size_t size);
 unique_fd open_data_file(const char *fname, bool readonly, size_t *size = NULL);
 void *mmap_data(int fd, const char *fname, bool readonly, size_t size);
 
-template<class T>
+template<class T = byte>
 class BlockStorage {
     unique_fd fd;
     T *data;
