@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package minion;
+
+message RouteHash {
+  repeated bytes minion_ids = 1;
+  repeated bytes subroute_ids = 2;
+  repeated uint32 hash_ranges = 3;
+  repeated uint32 hash_seeds = 4;
+  repeated string properties = 5;
+  float distance_score = 6;  // if not present - exact hash match
+};
+
+message RouteScore {
+  repeated bytes minion_ids = 2;
+  repeated bytes subroute_ids = 3;
+  repeated float scores = 4;
+};
