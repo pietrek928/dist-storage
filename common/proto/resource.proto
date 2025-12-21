@@ -29,12 +29,12 @@ message SessionData {
   int64 end_timestamp_s = 3;
 };
 
+message ResourceRequestResult { OperationResult result = 1; };
+
 service Resource {
   rpc ResourceSession(stream ResourceRequestUnion)
-      returns (stream OperationResult);
+      returns (stream ResourceRequestResult);
 };
-
-message OperationResult { OperationResult result = 1; };
 
 message ResourceRequestUnion {
   oneof v {

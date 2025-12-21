@@ -1,6 +1,6 @@
 #pragma once
 
-#include "grpc_callback.h"
+#include "callback.h"
 
 
 void grpc_loop(grpc::ServerCompletionQueue *cq) {

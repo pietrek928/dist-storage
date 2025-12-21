@@ -51,5 +51,5 @@ message SignedMessage {
   bytes signature = 2;
   bytes sender_pubkey = 3;  // optional - can be obtained
   bytes sender_cert = 4;  // optional - contains pubkey
-  bytes data = 5;  // bytes of type MessageData
+  bytes data = 5;  // signed bytes of type MessageData
 };
