@@ -4,6 +4,7 @@ package obj_store;
 
 import "resource.proto";
 
+
 enum HashType {
     SHA256 = 0;
     SHA512 = 1;

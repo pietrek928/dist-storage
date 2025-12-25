@@ -1,7 +1,5 @@
-#include "defs.h"
-
-#include "exception.h"
-
+#include <utils/defs.h>
+#include <utils/exception.h>
 
 void __ssl_err(const char *descr);
 

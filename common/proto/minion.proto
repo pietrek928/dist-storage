@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package minion;
 
+
 message IPV4Addr {
   bytes addr = 1;
   uint32 port = 2;
@@ -31,25 +32,9 @@ message HolePunchParameters {
   uint32 connect_count = 10;
 };
 
-message MinionRegister {
+message Register {
   bytes id = 1;
-  string service = 2;
-  IPV4Addr listen_ipv4 = 5;
-  IPV6Addr listen_ipv6 = 6;
-};
-
-message MessageData {
-  bytes recipient_id = 1;
-  oneof m {
-    HolePunchParameters hole_punch = 2;
-    MinionRegister minion_register = 3;
-  };
-};
-
-message SignedMessage {
-  bytes sender_id = 1;
-  bytes signature = 2;
-  bytes sender_pubkey = 3;  // optional - can be obtained
-  bytes sender_cert = 4;  // optional - contains pubkey
-  bytes data = 5;  // signed bytes of type MessageData
+  repeated string services = 2;
+  IPV4Addr listen_ipv4 = 3;
+  IPV6Addr listen_ipv6 = 4;
 };

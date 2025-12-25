@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package minion;
 
+
 message RouteHash {
   repeated bytes minion_ids = 1;
   repeated bytes subroute_ids = 2;

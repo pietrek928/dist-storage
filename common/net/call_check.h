@@ -1,11 +1,8 @@
 #pragma once
 
-#include <string>
+#include <utils/defs.h>
+#include <utils/exception.h>
 
-#include <exception.h>
-
-#define likely(x)      __builtin_expect(!!(x), 1)
-#define unlikely(x)    __builtin_expect(!!(x), 0)
 
 void __conn_err(const char *descr, const char * cmd, int ret_val);
 
@@ -15,4 +12,4 @@ inline void _ccall(const char *descr, const char *cmd, int ret_val) {
     }
 }
 
-#define ccall(descr, cmd) _ccall(descr, __AT__ " " #cmd, cmd)
+#define ccall(descr, cmd) _ccall(descr, __FILE__ ":" TOSTRING(__LINE__) " " #cmd, cmd)

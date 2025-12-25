@@ -21,6 +21,7 @@ public:
         return fd != -1;
     }
 
+    unique_fd() {}
     unique_fd(int fd) : fd(fd) {}
     unique_fd(const unique_fd&) = delete;
     unique_fd& operator=(const unique_fd&) = delete;

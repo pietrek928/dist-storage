@@ -1,6 +1,7 @@
 #include <grpcpp/grpcpp.h>
 #include "directory.grpc.pb.h" // Your discovery service proto
 
+
 class NodeResolver : public grpc_core::Resolver {
 public:
     NodeResolver(grpc_core::ResolverArgs args, std::shared_ptr<grpc::Channel> dir_channel)

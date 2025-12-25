@@ -4,6 +4,7 @@ package auth;
 
 import "resource.proto";
 
+
 enum CheckSessionStatus {
   OK = 0;
   UNAUTHORIZED = 1;

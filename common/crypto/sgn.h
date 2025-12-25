@@ -7,8 +7,8 @@
 #include <openssl/objects.h>
 #include <openssl/err.h>
 
-#include "defs.h"
-#include "guard_ptr.h"
+#include <utils/defs.h>
+#include <utils/guard_ptr.h>
 
 
 void SSLFreeData(unsigned char *data_ptr);
