@@ -39,14 +39,14 @@ PollEngine::PollEngine() {
     );
 }
 
-void PollEngine::push(int fd, Tcallback &callback, bool read, bool write) {
+void PollEngine::push(int fd, Tcallback callback, bool read, bool write) {
     {
         std::lock_guard<std::mutex> lock(map_mutex_);
         int request_flags = (read ? EPOLLIN : 0) | (write ? EPOLLOUT : 0);
         int watch_flags = request_flags | get_watch_flags(fd);
-        watchers_.insert(callback_map_t::value_type(
+        watchers_.emplace(
             fd, std::make_pair(request_flags, std::move(callback))
-        ));
+        );
 
         struct epoll_event ev{};
         ev.events = watch_flags | EPOLLONESHOT;
@@ -81,7 +81,7 @@ void PollEngine::poll(int timeout_ms) {
             auto flags = events[i].events;
             for (auto it = its.first; it != its.second;) {
                 if (flags & it->second.first) {
-                    callbacks.push_back(std::move(it->second.second));
+                    callbacks.emplace_back(std::move(it->second.second));
                     watchers_.erase(it++);
                 } else {
                     ++it;
@@ -93,4 +93,10 @@ void PollEngine::poll(int timeout_ms) {
     for (auto &callback : callbacks) {
         callback();
     }
+}
+
+void PollEngine::pop(int fd) {
+    std::lock_guard<std::mutex> lock(map_mutex_);
+    auto its = watchers_.equal_range(fd);
+    watchers_.erase(its.first, its.second);
 }

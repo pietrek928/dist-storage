@@ -1,6 +1,7 @@
 **/proto/cc
 **/proto/py
 **/proto/go
+/protos
 
 **/*Cache.txt
 **/CMakeFiles
@@ -9,3 +10,4 @@
 **/build
 **/.cache
 **/Makefile
+/_deps

@@ -2,14 +2,14 @@
 
 #include <mutex>
 #include <unordered_map>
-#include <functional>
+#include <absl/functional/any_invocable.h>
 
 #include <utils/unique_fd.h>
 
 
 class PollEngine {
     constexpr static int event_batch_size = 16;
-    using Tcallback = std::function<void()>;
+    using Tcallback = absl::AnyInvocable<void()>;
     using callback_map_t = std::unordered_multimap<int, std::pair<int, Tcallback>>;
 
     // variables
@@ -24,6 +24,7 @@ class PollEngine {
 
 public:
     PollEngine();
-    void push(int fd, Tcallback &callback, bool read, bool write = false);
+    void push(int fd, Tcallback callback, bool read, bool write = false);
     void poll(int timeout_ms);
+    void pop(int fd);
 };

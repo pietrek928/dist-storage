@@ -37,4 +37,5 @@ message SendMessageResponse {
 service Message {
   rpc Send(SignedMessage) returns (SendMessageResponse);
   rpc SendAsync(SignedMessage) returns (SendMessageResponse);
+  rpc Stream(stream SignedMessage) returns (stream SignedMessage);
 };
