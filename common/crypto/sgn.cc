@@ -10,25 +10,25 @@ void SSLFreeData(unsigned char *data_ptr) {
 
 SSLSigner::SSLSigner(int type, const byte_t *priv_key, size_t priv_key_len, const char *hash_name) {
     const EVP_MD *md;
-    scall("looking for hash",
+    ssl_call("looking for hash",
         md = EVP_get_digestbyname(hash_name)
     );
 
     EVP_PKEY_ptr pkey;
-    scall("EVP_PKEY_new_raw_private_key",
+    ssl_call("EVP_PKEY_new_raw_private_key",
         pkey = EVP_PKEY_new_raw_private_key(
             type, NULL, priv_key, priv_key_len
         )
     );
 
-    scall("EVP_MD_CTX_create", ctx = EVP_MD_CTX_create());
+    ssl_call("EVP_MD_CTX_create", ctx = EVP_MD_CTX_create());
 
-    scall(
+    ssl_call(
         "signer - inituializing signing context",
         EVP_DigestSignInit(ctx, NULL, md, NULL, pkey)
     );
 
-    scall(
+    ssl_call(
         "Getting signature size",
         EVP_DigestSignFinal(ctx, NULL, &sig_len)
     );
@@ -42,7 +42,7 @@ void SSLSigner::sign(
     const byte_t *data, size_t data_len, byte_t *out_buf
 ) const {
     size_t out_len = 0;
-    scall("signer - signing digest", EVP_DigestSign(
+    ssl_call("signer - signing digest", EVP_DigestSign(
         ctx, out_buf, &out_len, data, data_len
     ));
     if (unlikely(out_len != sig_len)) {
@@ -55,14 +55,14 @@ SSLVerifier::SSLVerifier(
     int type, EVP_PKEY *pkey, const char *hash_name
 ) {
     const EVP_MD *md;
-    scall("looking for hash",
+    ssl_call("looking for hash",
         md = EVP_get_digestbyname(hash_name)
     );
 
     ctx = EVP_MD_CTX_create();
-    scall("EVP_MD_CTX_create", ctx);
+    ssl_call("EVP_MD_CTX_create", ctx);
 
-    scall(
+    ssl_call(
         "verifier - initializing verification context",
         EVP_DigestVerifyInit(ctx, NULL, md, NULL, pkey)
     );
@@ -87,11 +87,11 @@ bool SSLVerifier::verify(
 
 SSLHasher::SSLHasher(const char *hash_name) {
     const EVP_MD *md;
-    scall("looking for hash",
+    ssl_call("looking for hash",
         md = EVP_get_digestbyname(hash_name)
     );
 
-    scall("init hasher ctx", ctx = EVP_MD_CTX_new());
+    ssl_call("init hasher ctx", ctx = EVP_MD_CTX_new());
 }
 
 int SSLHasher::digest_size() const {
@@ -99,18 +99,18 @@ int SSLHasher::digest_size() const {
 }
 
 void SSLHasher::start() {
-    scall("hashing - init", EVP_DigestInit_ex2(ctx, md, NULL));
+    ssl_call("hashing - init", EVP_DigestInit_ex2(ctx, md, NULL));
 }
 void SSLHasher::put(const byte_t *data, size_t data_len) {
-    scall("hashing - append data", EVP_DigestUpdate(ctx, data, data_len));
+    ssl_call("hashing - append data", EVP_DigestUpdate(ctx, data, data_len));
 }
 size_t SSLHasher::finish(byte_t *out_data) {
     unsigned int s;
-    scall("hashing - retrieving digest", EVP_DigestFinal_ex(ctx, (unsigned char*)out_data, &s));
+    ssl_call("hashing - retrieving digest", EVP_DigestFinal_ex(ctx, (unsigned char*)out_data, &s));
     return s;
 }
 void SSLHasher::reset() {
-    scall("hashing - resetting context", EVP_MD_CTX_reset(ctx));
+    ssl_call("hashing - resetting context", EVP_MD_CTX_reset(ctx));
 }
 
 size_t SSLHasher::compute_hash(const byte_t *data, size_t data_len, byte_t *out_data) {
@@ -129,33 +129,33 @@ void generate_rsa_key(
     size_t bits, std::vector<byte_t> &pubkey, std::vector<byte_t> &privkey
 ) {
     EVP_PKEY_CTX_ptr pkey = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL);
-    scall("EVP_PKEY_CTX_new_id", pkey);
+    ssl_call("EVP_PKEY_CTX_new_id", pkey);
 
-    scall("rsa keygen - init", EVP_PKEY_keygen_init(pkey));
+    ssl_call("rsa keygen - init", EVP_PKEY_keygen_init(pkey));
 
-    scall("rsa keygen - set bits", EVP_PKEY_CTX_set_rsa_keygen_bits(pkey, bits));
+    ssl_call("rsa keygen - set bits", EVP_PKEY_CTX_set_rsa_keygen_bits(pkey, bits));
 
     EVP_PKEY_ptr key;
-    scall("rsa keygen", EVP_PKEY_keygen(pkey, &key.ptr));
+    ssl_call("rsa keygen", EVP_PKEY_keygen(pkey, &key.ptr));
 
     size_t pubkey_len = 0;
-    scall(
+    ssl_call(
         "rsa keygen - get pubkey len",
         EVP_PKEY_get_raw_public_key(key, NULL, &pubkey_len)
     );
     pubkey.resize(pubkey_len);
-    scall(
+    ssl_call(
         "rsa keygen - get pubkey",
         EVP_PKEY_get_raw_public_key(key, pubkey.data(), &pubkey_len)
     );
 
     size_t privkey_len = 0;
-    scall(
+    ssl_call(
         "rsa keygen - get privkey len",
         EVP_PKEY_get_raw_private_key(key, NULL, &privkey_len)
     );
     privkey.resize(privkey_len);
-    scall(
+    ssl_call(
         "rsa keygen - get privkey",
         EVP_PKEY_get_raw_private_key(key, privkey.data(), &privkey_len)
     );
@@ -165,42 +165,42 @@ void generate_ecdsa_key(
     int curve_nid, std::vector<byte_t> &pubkey, std::vector<byte_t> &privkey
 ) {
     EVP_PKEY_CTX_ptr pkey;
-    scall("EVP_PKEY_CTX_new_id", pkey = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL));
+    ssl_call("EVP_PKEY_CTX_new_id", pkey = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL));
 
-    scall(
+    ssl_call(
         "ecdsa keygen - init",
         EVP_PKEY_keygen_init(pkey)
     );
 
-    scall(
+    ssl_call(
         "ecdsa keygen - set curve",
         EVP_PKEY_CTX_set_ec_paramgen_curve_nid(pkey, NID_X9_62_prime256v1)
     );
 
     EVP_PKEY_ptr key;
-    scall(
+    ssl_call(
         "ecdca keygen",
         EVP_PKEY_keygen(pkey, &key.ptr)
     );
 
     size_t pubkey_len = 0;
-    scall(
+    ssl_call(
         "ecdsa keygen - get pubkey len",
         EVP_PKEY_get_raw_public_key(key, NULL, &pubkey_len)
     );
     pubkey.resize(pubkey_len);
-    scall(
+    ssl_call(
         "ecdsa keygen - get pubkey",
         EVP_PKEY_get_raw_public_key(key, pubkey.data(), &pubkey_len)
     );
 
     size_t privkey_len = 0;
-    scall(
+    ssl_call(
         "ecdsa keygen - get privkey len",
         EVP_PKEY_get_raw_private_key(key, NULL, &privkey_len)
     );
     privkey.resize(privkey_len);
-    scall(
+    ssl_call(
         "ecdsa keygen - get privkey",
         EVP_PKEY_get_raw_private_key(key, privkey.data(), &privkey_len)
     );

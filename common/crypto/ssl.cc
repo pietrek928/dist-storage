@@ -16,7 +16,7 @@ int alpn_select_h2_cb(
     return SSL_TLSEXT_ERR_OK;
 }
 
-void prepare_ssl_for_grpc(SSL_CTX* ctx) {
+void prepare_ssl_for_grpc(SSL_CTX* ctx) {  // TODO: check err
     // Register the function pointer. The 'nullptr' at the end
     // is for optional user data (the 'arg' in the callback).
     SSL_CTX_set_alpn_select_cb(ctx, alpn_select_h2_cb, nullptr);

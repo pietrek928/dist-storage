@@ -12,4 +12,4 @@ inline void _ssl_call_check(const char *descr, bool ret_val) {
     }
 }
 
-#define scall(descr, cmd) _ssl_call_check(__FILE__ ":" TOSTRING(__LINE__) " " #cmd ": " descr, !!(cmd))
+#define ssl_call(descr, cmd) _ssl_call_check(__FILE__ ":" TOSTRING(__LINE__) " " #cmd ": " descr, !!(cmd))

@@ -30,10 +30,7 @@ void peer_id_from_hash(const byte_t *data, size_t data_len, const char *hash_alg
     }
 }
 
-void peer_id_from_cert(X509 *cert, const char *hash_algo, byte_t *out_buf) {
-    EVP_PKEY_ptr pubkey;
-    scall("cert - getting public key", pubkey = X509_get_pubkey(cert));
-
+void peer_id_from_pubkey(EVP_PKEY *pubkey, const char *hash_algo, byte_t *out_buf) {
     SSL_DATA_ptr pubkey_subject_info;
     auto subject_len = i2d_PUBKEY(pubkey, (unsigned char **)&pubkey_subject_info.ptr);
     if (subject_len <= 0 || !pubkey_subject_info) {
