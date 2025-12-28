@@ -2,6 +2,7 @@
 
 #include <openssl/err.h>
 
+
 SSLError::SSLError(const char * descr, long err) : descr(descr), err(err) {}
 SSLError::SSLError(const char * descr) : descr(descr) {
     err = ERR_get_error();

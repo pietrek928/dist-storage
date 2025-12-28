@@ -1,14 +1,13 @@
 # 1. Define Output Directories
 set(CC_OUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cc")
 set(PY_OUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/py")
-set(GO_OUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/go")
+# set(GO_OUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/go")
 
 # 2. Find all .proto files
 file(GLOB PROTO_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.proto")
 
-# 3. Locate plugins (more robust than hardcoded paths)
-find_program(GRPC_CPP_PLUGIN grpc_cpp_plugin)
-find_program(GRPC_PYTHON_PLUGIN grpc_python_plugin)
+# 3. Locate plugins
+set(PROTOC $<TARGET_FILE:protobuf::protoc>)
 # find_program(PROTOC_GEN_GO protoc-gen-go)
 
 # 4. Create Generation Commands
@@ -19,7 +18,7 @@ add_custom_command(
     # COMMAND ${CMAKE_COMMAND} -E make_directory ${GO_OUT_DIR}
 
     # C++ & Python Generation
-    COMMAND protoc --proto_path=${CMAKE_CURRENT_SOURCE_DIR}
+    COMMAND ${PROTOC} --proto_path=${CMAKE_CURRENT_SOURCE_DIR}
             --cpp_out=${CC_OUT_DIR}
             --grpc_cpp_out=${CC_OUT_DIR}
             --plugin=protoc-gen-grpc_cpp=${GRPC_CPP_PLUGIN}

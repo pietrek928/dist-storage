@@ -30,8 +30,8 @@ public:
     // This is called when gRPC acts as a CLIENT
     ConnectionHandle Connect(OnConnectCallback on_connect,
                              const ResolvedAddress& addr,
-                             const EndpointConfig& args,
-                             MemoryAllocator memory_allocator,
+                             const grpc_exp::EndpointConfig& args,
+                             grpc_exp::MemoryAllocator memory_allocator,
                              Duration timeout) override {
         // 1. Start your Hole Punching logic here
         // 2. Once connected and SSL-handshaked:

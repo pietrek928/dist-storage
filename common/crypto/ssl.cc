@@ -1,12 +1,10 @@
 #include "ssl.h"
 
 
-int alpn_select_h2_cb(SSL* ssl,
-                             const unsigned char** out,
-                             unsigned char* outlen,
-                             const unsigned char* in,
-                             unsigned int inlen,
-                             void* arg) {
+int alpn_select_h2_cb(
+    SSL* ssl, const unsigned char** out, unsigned char* outlen,
+    const unsigned char* in, unsigned int inlen, void* arg
+) {
     // We strictly look for "h2" (the protocol for HTTP/2)
     // The 'in' buffer contains the protocols offered by the client
     // For a simple 'force h2' approach, we just set 'out' to "h2"

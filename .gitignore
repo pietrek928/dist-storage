@@ -7,6 +7,7 @@
 **/CMakeFiles
 **/*.cmake
 
+*.json
 **/build
 **/.cache
 **/Makefile

@@ -39,10 +39,10 @@ public:
     ~SSLEndpoint();
 
     // Read and Write calling SSL_read and SSL_write
-    void Read(absl::AnyInvocable<void(absl::Status)> on_read,
-              grpc_exp::SliceBuffer* buffer, const ReadArgs* args) override;
-    void Write(absl::AnyInvocable<void(absl::Status)> on_write,
-           grpc_exp::SliceBuffer* data, const WriteArgs* args) override;
+    bool Read(absl::AnyInvocable<void(absl::Status)> on_read,
+              grpc_exp::SliceBuffer* buffer, const ReadArgs args) override;
+    bool Write(absl::AnyInvocable<void(absl::Status)> on_write,
+           grpc_exp::SliceBuffer* data, const WriteArgs args) override;
 
     // Required boilerplate for EventEngine
     const grpc_exp::EventEngine::ResolvedAddress& GetPeerAddress() const override;

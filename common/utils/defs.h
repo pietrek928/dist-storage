@@ -5,3 +5,4 @@
 #define unlikely(x)    __builtin_expect(!!(x), 0)
 
 typedef unsigned char byte_t;
+typedef int socket_t;

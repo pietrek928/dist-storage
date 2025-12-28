@@ -1,13 +1,19 @@
 #include "sgn.h"
 
 #include "call_check.h"
+#include <cstddef>
 
 
 void SSLFreeData(unsigned char *data_ptr) {
     OPENSSL_free(data_ptr);
 }
 
-SSLSigner::SSLSigner(int type, const byte_t *priv_key, size_t priv_key_len) {
+SSLSigner::SSLSigner(int type, const byte_t *priv_key, size_t priv_key_len, const char *hash_name) {
+    const EVP_MD *md;
+    scall("looking for hash",
+        md = EVP_get_digestbyname(hash_name)
+    );
+
     EVP_PKEY_ptr pkey;
     scall("EVP_PKEY_new_raw_private_key",
         pkey = EVP_PKEY_new_raw_private_key(
@@ -19,42 +25,52 @@ SSLSigner::SSLSigner(int type, const byte_t *priv_key, size_t priv_key_len) {
 
     scall(
         "signer - inituializing signing context",
-        EVP_DigestSignInit(ctx, NULL, EVP_sha256(), NULL, pkey)
+        EVP_DigestSignInit(ctx, NULL, md, NULL, pkey)
+    );
+
+    scall(
+        "Getting signature size",
+        EVP_DigestSignFinal(ctx, NULL, &sig_len)
     );
 }
 
-size_t SSLSigner::sign(
-    const byte_t *data, size_t data_len, byte_t *out_buf, size_t out_len
-) {
-    size_t sgn_len = out_len;
+size_t SSLSigner::signature_size() const {
+    return sig_len;
+}
+
+void SSLSigner::sign(
+    const byte_t *data, size_t data_len, byte_t *out_buf
+) const {
+    size_t out_len = 0;
     scall("signer - signing digest", EVP_DigestSign(
-        ctx, out_buf, &sgn_len, data, data_len
+        ctx, out_buf, &out_len, data, data_len
     ));
-    if (unlikely(sgn_len > out_len)) {
-        throw SSLError("EVP_DigestSign: buffer too small", -1);
+    if (unlikely(out_len != sig_len)) {
+        throw SSLError("EVP_DigestSign: returned invalid signature size", -1);
     }
-    return sgn_len;
 }
 
 
-SSLVerifier::SSLVerifier(int type, const byte_t *pub_key, size_t pub_key_len) {
-    EVP_PKEY_ptr pkey = EVP_PKEY_new_raw_public_key(
-        type, NULL, pub_key, pub_key_len
+SSLVerifier::SSLVerifier(
+    int type, EVP_PKEY *pkey, const char *hash_name
+) {
+    const EVP_MD *md;
+    scall("looking for hash",
+        md = EVP_get_digestbyname(hash_name)
     );
-    scall("EVP_PKEY_new_raw_public_key", pkey);
 
     ctx = EVP_MD_CTX_create();
     scall("EVP_MD_CTX_create", ctx);
 
     scall(
         "verifier - initializing verification context",
-        EVP_DigestVerifyInit(ctx, NULL, EVP_sha256(), NULL, pkey)
+        EVP_DigestVerifyInit(ctx, NULL, md, NULL, pkey)
     );
 }
 
 bool SSLVerifier::verify(
     const byte_t *dgst, size_t dgst_len, const byte_t *sgn, size_t sgn_len
-) {
+) const {
     auto result = EVP_DigestVerify(
         ctx, sgn, sgn_len, dgst, dgst_len
     );
@@ -67,6 +83,46 @@ bool SSLVerifier::verify(
             throw SSLError("EVP_DigestVerify");
     }
 }
+
+
+SSLHasher::SSLHasher(const char *hash_name) {
+    const EVP_MD *md;
+    scall("looking for hash",
+        md = EVP_get_digestbyname(hash_name)
+    );
+
+    scall("init hasher ctx", ctx = EVP_MD_CTX_new());
+}
+
+int SSLHasher::digest_size() const {
+    return EVP_MD_size(md);
+}
+
+void SSLHasher::start() {
+    scall("hashing - init", EVP_DigestInit_ex2(ctx, md, NULL));
+}
+void SSLHasher::put(const byte_t *data, size_t data_len) {
+    scall("hashing - append data", EVP_DigestUpdate(ctx, data, data_len));
+}
+size_t SSLHasher::finish(byte_t *out_data) {
+    unsigned int s;
+    scall("hashing - retrieving digest", EVP_DigestFinal_ex(ctx, (unsigned char*)out_data, &s));
+    return s;
+}
+void SSLHasher::reset() {
+    scall("hashing - resetting context", EVP_MD_CTX_reset(ctx));
+}
+
+size_t SSLHasher::compute_hash(const byte_t *data, size_t data_len, byte_t *out_data) {
+    try {
+        start();
+        put(data, data_len);
+        return finish(out_data);
+    } catch(...) {
+        reset();
+        throw;
+    }
+};
 
 
 void generate_rsa_key(
@@ -149,42 +205,3 @@ void generate_ecdsa_key(
         EVP_PKEY_get_raw_private_key(key, privkey.data(), &privkey_len)
     );
 }
-
-SSLHasher::SSLHasher(const char *hash_name) {
-    const EVP_MD *md;
-    scall("looking for hash",
-        md = EVP_get_digestbyname(hash_name)
-    );
-
-    scall("init hasher ctx", ctx = EVP_MD_CTX_new());
-}
-
-int SSLHasher::digest_size() {
-    return EVP_MD_size(md);
-}
-
-void SSLHasher::start() {
-    scall("hashing - init", EVP_DigestInit_ex2(ctx, md, NULL));
-}
-void SSLHasher::put(const byte_t *data, size_t data_len) {
-    scall("hashing - append data", EVP_DigestUpdate(ctx, data, data_len));
-}
-size_t SSLHasher::finish(byte_t *out_data) {
-    unsigned int s;
-    scall("hashing - retrieving digest", EVP_DigestFinal_ex(ctx, (unsigned char*)out_data, &s));
-    return s;
-}
-void SSLHasher::reset() {
-    scall("hashing - resetting context", EVP_MD_CTX_reset(ctx));
-}
-
-size_t SSLHasher::compute_hash(const byte_t *data, size_t data_len, byte_t *out_data) {
-    try {
-        start();
-        put(data, data_len);
-        return finish(out_data);
-    } catch(...) {
-        reset();
-        throw;
-    }
-};

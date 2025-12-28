@@ -2,13 +2,14 @@ syntax = "proto3";
 
 package message;
 
+import "net.proto";
 import "minion.proto";
 
 
 message MessageData {
   bytes recipient_id = 1;
   oneof m {
-    minion.HolePunchParameters hole_punch = 2;
+    net.HolePunchParameters hole_punch = 2;
     minion.Register minion_register = 3;
   };
 };
@@ -23,10 +24,9 @@ enum SendMessageStatus {
 message SignedMessage {
   bytes sender_id = 1;
   bytes signature = 2;
-  bytes sender_pubkey = 3; // optional - can be obtained
-  bytes sender_cert = 4;   // optional - contains pubkey
-  bytes data = 5;          // signed bytes of type MessageData
-  int32 ttl = 6;
+  bytes sender_cert = 3;   // optional cert
+  bytes data = 4;          // signed bytes of type MessageData
+  int32 ttl = 5;
 };
 
 message SendMessageResponse {

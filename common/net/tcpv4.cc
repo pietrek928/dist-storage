@@ -1,9 +1,5 @@
 #include "tcpv4.h"
 
-#include "helpers.h"
-#include "minion.pb.h"
-#include "unique_fd.h"
-
 #include <cstdint>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -11,13 +7,19 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <utils/unique_fd.h>
+#include <utils/sys/time.h>
+#include <utils/sys/socket.h>
+#include "call_check.h"
+
+
 void ipv4_convert_addr(const std::string &addr, in_addr *out) {
     if (!addr.size()) {
         out->s_addr = INADDR_ANY;
         return;
     }
     if (addr.size() != 4) {
-        throw std::invalid_argument("Invalid IPv4 address string length " + std::to_string(addr.size());
+        throw std::invalid_argument("Invalid IPv4 address string length " + std::to_string(addr.size()));
     }
     memcpy(out, addr.data(), 4);
 }
@@ -48,7 +50,7 @@ void tcpv4_close_socket(socket_t fd) {
     ccall("closing socket", close(fd));
 }
 
-void tcpv4_bind_port(socket_t fd, const minion::IPV4Addr &bind_addr) {
+void tcpv4_bind_port(socket_t fd, const net::IPV4Addr &bind_addr) {
     sockaddr_in addr;
     addr.sin_family = AF_INET;
     ipv4_convert_port(bind_addr.port(), &addr.sin_port);
@@ -57,7 +59,7 @@ void tcpv4_bind_port(socket_t fd, const minion::IPV4Addr &bind_addr) {
     ccall("binding port", bind(fd, (struct sockaddr*)(&addr), sizeof(addr)));
 }
 
-void tcpv4_connect(socket_t fd, const minion::IPV4Addr &dst_addr) {
+void tcpv4_connect(socket_t fd, const net::IPV4Addr &dst_addr) {
     sockaddr_in addr;
     addr.sin_family = AF_INET;
     ipv4_convert_port(dst_addr.port(), &addr.sin_port);
@@ -66,7 +68,7 @@ void tcpv4_connect(socket_t fd, const minion::IPV4Addr &dst_addr) {
     ccall("connecting", connect(fd, (struct sockaddr*)(&addr), sizeof(addr)));
 }
 
-int tcpv4_connect_unsafe(socket_t fd, const minion::IPV4Addr &dst_addr) {
+int tcpv4_connect_unsafe(socket_t fd, const net::IPV4Addr &dst_addr) {
     sockaddr_in addr;
     addr.sin_family = AF_INET;
     ipv4_convert_port(dst_addr.port(), &addr.sin_port);
@@ -108,7 +110,7 @@ TCPv4AcceptResult tcpv4_accept_unsafe(socket_t fd, bool create_blocking) {
     return ret;
 }
 
-socket_t tcpv4_hole_punch(const minion::HolePunchParameters &settings) {
+socket_t tcpv4_hole_punch(const net::HolePunchParameters &settings) {
     auto connect_tries = settings.connect_count();
     bool listen = settings.listen_first();
     float connect_sec = settings.connect_sec_start();
@@ -116,23 +118,23 @@ socket_t tcpv4_hole_punch(const minion::HolePunchParameters &settings) {
         auto start_timestamp = timespec_timestamp();
 
         unique_fd main_fd = tcpv4_new_socket(true);
-        tcpv4_bind_port(main_fd, settings.src_addr);
+        tcpv4_bind_port(main_fd, settings.src_ipv4());
         set_socket_timeout(main_fd, connect_sec);
 
         if (listen) {
             tcpv4_listen(main_fd);
             auto res = tcpv4_accept_unsafe(main_fd, true);
             if (res.new_fd >= 0) {
-                if (res.addr.sin_addr.s_addr != settings.dst_addr) {
+                if (res.addr.addr() != settings.dst_ipv4().addr()) {
                     throw ConnectionError("Incorrent peer ip");
                 }
-                if (res.addr.sin_port != settings.dst_port) {
+                if (res.addr.port() != settings.dst_ipv4().port()) {
                     throw ConnectionError("Incorrent peer port");
                 }
                 return res.new_fd;
             }
         } else {
-            if (!tcpv4_connect_unsafe(main_fd, settings.dst_port, settings.dst_addr)) {
+            if (!tcpv4_connect_unsafe(main_fd, settings.dst_ipv4())) {
                 return main_fd.handle();
             }
         }
@@ -141,9 +143,9 @@ socket_t tcpv4_hole_punch(const minion::HolePunchParameters &settings) {
         sleep_sec(connect_sec - timespec_diff_sec(start_timestamp, end_timestamp));
 
         listen = !listen;
-        connect_sec *= settings.connect_sec_scale;
-        if (connect_sec > settings.connect_sec_max) {
-            connect_sec = settings.connect_sec_max;
+        connect_sec *= settings.connect_sec_scale();
+        if (connect_sec > settings.connect_sec_max()) {
+            connect_sec = settings.connect_sec_max();
         }
     } while (--connect_tries);
 

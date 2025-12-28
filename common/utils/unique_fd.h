@@ -2,11 +2,12 @@
 
 #include <unistd.h> // For close()
 
-#include "err.h"
+#include "defs.h"
+#include "sys/err.h"
 
 
 class unique_fd {
-    int fd = -1;
+    socket_t fd = -1;
 public:
     void reset() {
         if (fd != -1) {
@@ -22,7 +23,7 @@ public:
     }
 
     unique_fd() {}
-    unique_fd(int fd) : fd(fd) {}
+    unique_fd(socket_t fd) : fd(fd) {}
     unique_fd(const unique_fd&) = delete;
     unique_fd& operator=(const unique_fd&) = delete;
     unique_fd(unique_fd&& other) : fd(other.fd) {other.fd = -1;}
@@ -42,6 +43,11 @@ public:
         return valid();
     }
 
-    ~unique_fd() {reset();}
+    socket_t handle() {
+        auto r = fd;
+        fd = -1;
+        return r;
+    }
 
+    ~unique_fd() {reset();}
 };

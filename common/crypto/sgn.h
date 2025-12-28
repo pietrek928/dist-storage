@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <vector>
 #include <openssl/evp.h>
 #include <openssl/rsa.h>
@@ -13,14 +14,6 @@
 
 void SSLFreeData(unsigned char *data_ptr);
 
-template <auto DeleteFn>
-struct DeleterFromFn {
-    template <typename T>
-    void operator()(T* ptr) const {
-        DeleteFn(ptr);
-    }
-};
-
 typedef guard_ptr<EVP_MD_CTX, EVP_MD_CTX_free> EVP_MD_CTX_ptr;
 typedef guard_ptr<EVP_PKEY, EVP_PKEY_free> EVP_PKEY_ptr;
 typedef guard_ptr<EVP_PKEY_CTX, EVP_PKEY_CTX_free> EVP_PKEY_CTX_ptr;
@@ -28,18 +21,20 @@ typedef guard_ptr<unsigned char, SSLFreeData> SSL_DATA_ptr;
 
 class SSLSigner {
     EVP_MD_CTX_ptr ctx;
+    size_t sig_len = 0;
 
     public:
-    SSLSigner(int type, const byte_t *priv_key, size_t priv_key_len);
-    size_t sign(const byte_t *data, size_t data_len, byte_t *out_buf, size_t out_len);
+    SSLSigner(int type, const byte_t *priv_key, size_t priv_key_len, const char *hash_name = "sha512");
+    size_t signature_size() const;
+    void sign(const byte_t *data, size_t data_len, byte_t *out_buf) const;
 };
 
 class SSLVerifier {
     EVP_MD_CTX_ptr ctx;
 
     public:
-    SSLVerifier(int type, const byte_t *pub_key, size_t pub_key_len);
-    bool verify(const byte_t *dgst, size_t dgst_len, const byte_t *sgn, size_t sgn_len);
+    SSLVerifier(int type, EVP_PKEY *pkey, const char *hash_name = "sha512");
+    bool verify(const byte_t *dgst, size_t dgst_len, const byte_t *sgn, size_t sgn_len) const;
 };
 
 class SSLHasher {
@@ -48,7 +43,7 @@ class SSLHasher {
 
     public:
     SSLHasher(const char *hash_name);
-    int digest_size();
+    int digest_size() const;
 
     void start();
     void put(const byte_t *data, size_t data_len);

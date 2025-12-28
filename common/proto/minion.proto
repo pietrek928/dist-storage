@@ -2,39 +2,11 @@ syntax = "proto3";
 
 package minion;
 
-
-message IPV4Addr {
-  bytes addr = 1;
-  uint32 port = 2;
-};
-
-message IPV6Addr {
-  bytes addr = 1;
-  uint32 port = 2;
-};
-
-message HolePunchParameters {
-  oneof src_addr {
-    IPV4Addr src_ipv4 = 1;
-    IPV6Addr src_ipv6 = 2;
-  };
-  oneof dst_addr {
-    IPV4Addr dst_ipv4 = 3;
-    IPV6Addr dst_ipv6 = 4;
-  };
-
-  uint64 start_time_ms = 5;
-
-  bool listen_first = 6;
-  float connect_sec_start = 7;
-  float connect_sec_max = 8;
-  float connect_sec_scale = 9;
-  uint32 connect_count = 10;
-};
+import "net.proto";
 
 message Register {
   bytes id = 1;
   repeated string services = 2;
-  IPV4Addr listen_ipv4 = 3;
-  IPV6Addr listen_ipv6 = 4;
+  net.IPV4Addr listen_ipv4 = 3;
+  net.IPV6Addr listen_ipv6 = 4;
 };

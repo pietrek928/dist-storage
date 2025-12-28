@@ -38,8 +38,8 @@ SSLEndpoint::~SSLEndpoint() {
     poller->pop(fd);
 }
 
-void SSLEndpoint::Read(absl::AnyInvocable<void(absl::Status)> on_read,
-            grpc_exp::SliceBuffer* buffer, const ReadArgs* args) {
+bool SSLEndpoint::Read(absl::AnyInvocable<void(absl::Status)> on_read,
+            grpc_exp::SliceBuffer* buffer, const ReadArgs args) {
     std::lock_guard<std::mutex> lock(ssl_mutex);
 
     char temp_buf[ssl_read_buffer_size];
@@ -48,79 +48,63 @@ void SSLEndpoint::Read(absl::AnyInvocable<void(absl::Status)> on_read,
     if (ret > 0) {
         buffer->Append(grpc_exp::Slice::FromCopiedBuffer(temp_buf, ret));
         on_read(absl::OkStatus());
-        return;
+        return true;
     }
 
     int err = SSL_get_error(ssl, ret);
     if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
         bool want_read = (err == SSL_ERROR_WANT_READ);
         poller->push(fd, [this, cb = std::move(on_read), buffer]() mutable {
-            this->Read(std::move(cb), buffer, nullptr);
+            this->Read(std::move(cb), buffer, ReadArgs{});
         }, want_read, !want_read);
-        return;
+        return false;
     }
 
     on_read(absl::InternalError("SSL_read failed"));
+    return true;
 }
 
-void SSLEndpoint::Write(absl::AnyInvocable<void(absl::Status)> on_write,
-        grpc_exp::SliceBuffer* data, const WriteArgs* args) {
+bool SSLEndpoint::Write(absl::AnyInvocable<void(absl::Status)> on_write,
+        grpc_exp::SliceBuffer* data, const WriteArgs args) {
     std::lock_guard<std::mutex> lock(ssl_mutex);
 
-    if (data->Count() == 0) {
-        // on_read_or_write_finished(std::move(on_write), absl::OkStatus());
-        on_write(absl::OkStatus());
-        return;
-    }
+    // Try to write as much as possible in a loop to avoid stack overflow
+    while (data->Count() > 0) {
+        auto first = data->TakeFirst();
+        int ret = SSL_write(ssl, first.begin(), first.size());
 
-    // Take the first slice to attempt writing
-    auto first = data->TakeFirst();
+        if (ret > 0) {
+            size_t written = static_cast<size_t>(ret);
+            if (written < first.size()) {
+                // Partial write - put back the remainder
+                auto remaining = grpc_exp::Slice::FromCopiedBuffer(
+                    reinterpret_cast<const char*>(first.begin() + written),
+                    first.size() - written
+                );
+                data->Prepend(std::move(remaining));
 
-    // SSL_write needs a raw pointer and size
-    int ret = SSL_write(ssl, first.begin(), first.size());
-
-    if (ret > 0) {
-        size_t written = static_cast<size_t>(ret);
-        if (written < first.size()) {
-            // PARTIAL WRITE: Create a new slice for the remaining part
-            // We use the pointer-based constructor for the remaining segment
-            auto remaining = grpc_exp::Slice::FromCopiedBuffer(
-                reinterpret_cast<const char*>(first.begin() + written),
-                first.size() - written
-            );
-            data->Prepend(std::move(remaining));
-
-            // Re-register for when the socket is writable again
-            poller->push(fd, [this, cb = std::move(on_write), data]() mutable {
-                this->Write(std::move(cb), data, nullptr);
-            }, false, true);
-            return;
-        }
-
-        // FULL SLICE WRITTEN: Check if more slices remain
-        if (data->Count() == 0) {
-            // on_read_or_write_finished(std::move(on_write), absl::OkStatus());
-            on_write(absl::OkStatus());
+                poller->push(fd, [this, cb = std::move(on_write), data]() mutable {
+                    this->Write(std::move(cb), data, WriteArgs{});
+                }, false, true);
+                return false;
+            }
+            // Slice finished, continue loop to next slice
         } else {
-            this->Write(std::move(on_write), data, args);
+            int err = SSL_get_error(ssl, ret);
+            if (err == SSL_ERROR_WANT_WRITE || err == SSL_ERROR_WANT_READ) {
+                data->Prepend(std::move(first));
+                poller->push(fd, [this, cb = std::move(on_write), data]() mutable {
+                    this->Write(std::move(cb), data, WriteArgs{});
+                }, (err == SSL_ERROR_WANT_READ), (err == SSL_ERROR_WANT_WRITE));
+                return false;
+            }
+            on_write(absl::InternalError("SSL_write failed"));
+            return true;
         }
-        return;
     }
 
-    int err = SSL_get_error(ssl, ret);
-    if (err == SSL_ERROR_WANT_WRITE || err == SSL_ERROR_WANT_READ) {
-        bool want_write = (err == SSL_ERROR_WANT_WRITE);
-
-        // Put the original slice back entirely
-        data->Prepend(std::move(first));
-
-        poller->push(fd, [this, cb = std::move(on_write), data]() mutable {
-            this->Write(std::move(cb), data, nullptr);
-        }, !want_write, want_write);
-        return;
-    }
-
-    on_write(absl::InternalError("SSL_write failed"));
+    on_write(absl::OkStatus());
+    return true;
 }
 
 // Required boilerplate for EventEngine
