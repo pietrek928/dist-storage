@@ -37,7 +37,17 @@ void peer_id_from_pubkey(EVP_PKEY *pubkey, const char *hash_algo, byte_t *out_bu
         throw SSLError("cert - transforming to subject form failed");
     }
 
-    peer_id_from_hash(pubkey_subject_info.ptr, subject_len, hash_algo, out_buf);
+    peer_id_from_hash(pubkey_subject_info, subject_len, hash_algo, out_buf);
+}
+
+void peer_id_from_cert(const byte_t *cert, size_t cert_len, const char *hash_algo, byte_t *out_buf) {
+    X509_ptr x509;
+    EVP_PKEY_ptr pubkey;
+
+    ssl_call("converting 509 to string", x509 = d2i_X509(nullptr, cert, cert_len));
+    ssl_call("getting public key", pubkey = X509_get_pubkey(x509));
+
+    peer_id_from_pubkey(pubkey, hash_algo, out_buf);
 }
 
 std::string x509_to_string(X509* cert) {

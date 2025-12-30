@@ -9,6 +9,8 @@ void fill_message(
     m->set_sender_id(sender_id);
     if (sender_cert) {
         m->set_sender_cert(*sender_cert);
+    } else {
+        m->clear_sender_cert();
     }
     m->set_data(data.SerializeAsString());
     m->set_ttl(ttl);
