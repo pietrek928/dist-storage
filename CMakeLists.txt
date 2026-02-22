@@ -41,8 +41,9 @@ endif()
 
 
 add_subdirectory(common/proto)
-include_directories(${CMAKE_SOURCE_DIR}/common/)
+include_directories(${CMAKE_SOURCE_DIR}/common)
 include_directories(${CMAKE_SOURCE_DIR}/common/proto/cc)
 
 add_subdirectory(common/grpc)
+add_subdirectory(common/peer)
 add_subdirectory(minion/obj_store)

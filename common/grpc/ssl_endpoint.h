@@ -1,50 +1,48 @@
 #pragma once
 
 #include <mutex>
+#include <memory>
 #include <grpc/event_engine/event_engine.h>
+#include <grpc/event_engine/slice.h>
+#include <grpc/event_engine/slice_buffer.h>
 
 #include <utils/unique_fd.h>
 #include <utils/guard_ptr.h>
 #include <utils/poll_engine.h>
 #include <crypto/ssl.h>
 
-
 namespace grpc_exp = grpc_event_engine::experimental;
 
-grpc_exp::EventEngine::ResolvedAddress populate_local_addr(int fd);
-grpc_exp::EventEngine::ResolvedAddress populate_peer_addr(int fd);
+class SSLEndpoint : public grpc_exp::EventEngine::Endpoint,
+                    public std::enable_shared_from_this<SSLEndpoint> {
 
+    // 16KB is a standard TLS record size
+    constexpr static int kSslReadBufferSize = 16 * 1024;
 
-class SSLEndpoint : public grpc_exp::EventEngine::Endpoint {
-    // TODO: is it needed ?
-    // void on_read_or_write_finished(absl::AnyInvocable<void(absl::Status)> cb, absl::Status status) {
-    //     // Dispatching to gRPC's default engine is the safest way to trigger the next step
-    //     grpc_exp::GetDefaultEventEngine()->Run(
-    //         [cb = std::move(cb), status]() mutable {
-    //             cb(status);
-    //         }
-    //     );
-    // }
-    constexpr static int ssl_read_buffer_size = 8192;
+    unique_fd fd_;
+    SSL_ptr ssl_;
+    std::shared_ptr<PollEngine> poller_;
+    std::mutex ssl_mutex_;
 
-    unique_fd fd;
-    SSL_ptr ssl;
-    PollEngine* poller;
-    std::mutex ssl_mutex;
-    grpc_exp::EventEngine::ResolvedAddress peer_addr;
-    grpc_exp::EventEngine::ResolvedAddress local_addr;
+    grpc_exp::EventEngine::ResolvedAddress peer_addr_;
+    grpc_exp::EventEngine::ResolvedAddress local_addr_;
+
+    // Internal helpers to handle logic without mutex contention
+    void DoRead(absl::AnyInvocable<void(absl::Status)> on_read,
+                grpc_exp::SliceBuffer* buffer);
+    void DoWrite(absl::AnyInvocable<void(absl::Status)> on_write,
+                 grpc_exp::SliceBuffer* data);
 
 public:
-    SSLEndpoint(int fd, SSL* ssl, PollEngine* poller);
-    ~SSLEndpoint();
+    SSLEndpoint(int fd, SSL* ssl, std::shared_ptr<PollEngine> poller);
+    ~SSLEndpoint() override;
 
-    // Read and Write calling SSL_read and SSL_write
     bool Read(absl::AnyInvocable<void(absl::Status)> on_read,
               grpc_exp::SliceBuffer* buffer, const ReadArgs args) override;
-    bool Write(absl::AnyInvocable<void(absl::Status)> on_write,
-           grpc_exp::SliceBuffer* data, const WriteArgs args) override;
 
-    // Required boilerplate for EventEngine
+    bool Write(absl::AnyInvocable<void(absl::Status)> on_write,
+               grpc_exp::SliceBuffer* data, const WriteArgs args) override;
+
     const grpc_exp::EventEngine::ResolvedAddress& GetPeerAddress() const override;
     const grpc_exp::EventEngine::ResolvedAddress& GetLocalAddress() const override;
 };

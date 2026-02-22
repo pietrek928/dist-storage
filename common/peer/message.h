@@ -4,8 +4,14 @@
 #include <message.pb.h>
 
 
-void fill_message(
-    message::SignedMessage *m,
-    const std::string sender_id, const SSLSigner &signer, const message::MessageData &data,
-    int ttl = 4, const std::string *sender_cert = NULL
+void fillMessageData(
+    message::SignedMessage* msg,
+    const message::MessageData &data,
+    const SSLSigner &signer
+);
+
+void getMessageData(
+    const message::SignedMessage &msg,
+    message::MessageData* data,
+    const SSLVerifier &verifier
 );

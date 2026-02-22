@@ -10,6 +10,10 @@ file(GLOB PROTO_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.proto")
 set(PROTOC $<TARGET_FILE:protobuf::protoc>)
 # find_program(PROTOC_GEN_GO protoc-gen-go)
 
+# Get the paths to the plugin executables
+set(GRPC_CPP_PLUGIN $<TARGET_FILE:grpc_cpp_plugin>)
+set(GRPC_PYTHON_PLUGIN $<TARGET_FILE:grpc_python_plugin>)
+
 # 4. Create Generation Commands
 add_custom_command(
     OUTPUT "${CC_OUT_DIR}" "${PY_OUT_DIR}" # "${GO_OUT_DIR}"

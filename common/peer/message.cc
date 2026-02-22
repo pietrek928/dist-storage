@@ -1,20 +1,35 @@
-#include "create.h"
+#include "message.h"
+
+#include <stdexcept>
 
 
-void fill_message(
-    message::SignedMessage *m,
-    const std::string sender_id, const SSLSigner &signer, const message::MessageData &data,
-    int ttl, const std::string *sender_cert
+void fillMessageData(
+    message::SignedMessage* msg,
+    const message::MessageData &data,
+    const SSLSigner &signer
 ) {
-    m->set_sender_id(sender_id);
-    if (sender_cert) {
-        m->set_sender_cert(*sender_cert);
-    } else {
-        m->clear_sender_cert();
+    if (!data.SerializeToString(msg->mutable_data())) {
+        throw std::invalid_argument("Serializing MessageData failed");
     }
-    m->set_data(data.SerializeAsString());
-    m->set_ttl(ttl);
+    msg->mutable_signature()->resize(signer.signature_size());
+    signer.sign(
+        (const byte_t*)msg->data().data(), msg->data().size(),
+        (byte_t*)msg->mutable_signature()->data()
+    );
+}
 
-    m->mutable_signature()->resize(signer.signature_size());
-    signer.sign((const byte_t*)m->data().data(), m->data().size(), (byte_t*)m->mutable_signature()->data());
+void getMessageData(
+    const message::SignedMessage &msg,
+    message::MessageData* data,
+    const SSLVerifier &verifier
+) {
+    if (!verifier.verify(
+        (const byte_t*)msg.data().data(), msg.data().size(),
+        (const byte_t*)msg.signature().data(), msg.signature().size()
+    )) {
+        throw std::invalid_argument("Invalid signature");
+    }
+    if (!data->ParseFromString(msg.data())) {
+        throw std::invalid_argument("Parsing MessageData failed");
+    }
 }

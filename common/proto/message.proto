@@ -24,7 +24,7 @@ enum SendMessageStatus {
 message SignedMessage {
   bytes sender_id = 1;
   bytes signature = 2;
-  bytes sender_cert = 3;   // optional cert
+  bytes sender_cert = 3;   // optional sender cert
   bytes data = 4;          // signed bytes of type MessageData
   int32 ttl = 5;
 };
