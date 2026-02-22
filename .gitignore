@@ -1,6 +1,7 @@
 **/proto/cc
 **/proto/py
 **/proto/go
+**/generated
 /protos
 
 **/*Cache.txt
@@ -12,3 +13,5 @@
 **/.cache
 **/Makefile
 /_deps
+
+*.jar
