@@ -32,7 +32,7 @@ message HolePunchParameters {
   uint32 connect_count = 10;
 };
 
-message ServerAddress {
+message ListenParameters {
     IPV4Addr ipv4 = 1;
     IPV6Addr ipv6 = 2;
 };

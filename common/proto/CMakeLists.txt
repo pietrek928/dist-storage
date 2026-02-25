@@ -1,3 +1,5 @@
+find_package(Protobuf REQUIRED)
+
 # 1. Define Output Directories
 set(CC_OUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cc")
 set(PY_OUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/py")
@@ -22,7 +24,9 @@ add_custom_command(
     # COMMAND ${CMAKE_COMMAND} -E make_directory ${GO_OUT_DIR}
 
     # C++ & Python Generation
-    COMMAND ${PROTOC} --proto_path=${CMAKE_CURRENT_SOURCE_DIR}
+    COMMAND ${PROTOC}
+            --proto_path=${CMAKE_CURRENT_SOURCE_DIR}
+            --proto_path=${Protobuf_INCLUDE_DIR}
             --cpp_out=${CC_OUT_DIR}
             --grpc_cpp_out=${CC_OUT_DIR}
             --plugin=protoc-gen-grpc_cpp=${GRPC_CPP_PLUGIN}

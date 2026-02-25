@@ -4,6 +4,7 @@ package minion;
 
 import "net.proto";
 
+
 message Register {
   bytes id = 1;
   repeated string services = 2;

@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package query;
+
+
+enum ColumnOperation {
+    CONST = 0;
+    ADD = 1;
+    SUB = 2;
+    MUL = 3;
+    DIV = 4;
+    NEG = 5;  // -x
+    INV = 6;  // 1/x
+    ABS = 7;  // |x|
+    SQRT = 8;
+    EXP = 9;
+    LN = 10;
+    LOG = 11;
+
+    NOT = 30;
+    AND = 31;
+    OR = 32;
+    XOR = 35;
+    NAND = 33;
+    NOR = 34;
+    XNOR = 36;
+
+    EQ = 50;
+    NEQ = 51;
+    GT = 52;
+    LT = 53;
+    GTE = 54;
+    LTE = 55;
+    IN = 56;
+    NOT_IN = 57;
+    LIKE = 58;
+    NOT_LIKE = 59;
+    ILIKE = 60;
+    NOT_ILIKE = 61;
+    IS_NULL = 62;
+    IS_NOT_NULL = 63;
+    BETWEEN = 64;
+    NOT_BETWEEN = 65;
+
+    MIN = 104;
+    MAX = 105;
+    SUM = 106;
+    COUNT = 107;
+    AVG = 108;
+    MEDIAN = 109;
+    STD = 110;
+    VAR = 111;
+
+    FILTER = 250;
+    OFFSET = 251;
+    LIMIT = 252;
+    INNER_JOIN = 253;
+    OUTER_JOIN = 254;
+    LEFT_JOIN = 255;
+    RIGHT_JOIN = 256;
+
+    // TODO: Low level processing ops
+
+    NOP = 400;
+
+    INVALID = 500;
+};

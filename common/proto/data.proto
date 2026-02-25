@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package data;
+
+import "google/protobuf/struct.proto";
+
+
+enum ValueType {
+    Bool = 0;
+    Int8 = 1;
+    UInt8 = 2;
+    Int16 = 3;
+    UInt16 = 4;
+    Int32 = 5;
+    UInt32 = 6;
+    Int64 = 7;
+    UInt64 = 8;
+    Float32 = 9;
+    Float64 = 10;
+    String = 11;
+    Bytes = 12;
+    Any = 13;  // means type is unspecified within context
+    JSON = 14;
+};
+
+message BoolColumn { bytes data = 1; };
+message Int8Column { bytes data = 1; };
+message UInt8Column { bytes data = 1; };
+message Int16Column { bytes data = 1; };  // little endian
+message UInt16Column { bytes data = 1; }; // little endian
+message Int32Column { repeated int32 data = 1; };
+message UInt32Column { repeated uint32 data = 1; };
+message Int64Column { repeated int64 data = 1; };
+message UInt64Column { repeated uint64 data = 1; };
+message Float32Column { repeated float data = 1; };
+message Float64Column { repeated double data = 1; };
+message StringColumn { repeated string data = 1; };
+message BytesColumn { repeated bytes data = 1; };
+message JSONColumn { repeated google.protobuf.Struct data = 1; };
+
+message Column {
+    string name = 1;
+    oneof data {
+        BoolColumn bool = 2;
+        Int8Column int8 = 3;
+        UInt8Column uint8 = 4;
+        Int16Column int16 = 5;
+        UInt16Column uint16 = 6;
+        Int32Column int32 = 7;
+        UInt32Column uint32 = 8;
+        Int64Column int64 = 9;
+        UInt64Column uint64 = 10;
+        Float32Column float32 = 11;
+        Float64Column float64 = 12;
+        StringColumn string = 13;
+        BytesColumn bytes = 14;
+        JSONColumn json = 15;
+    }
+};
+
+message DataFrame {
+    // TODO: id ?
+    repeated Column columns = 1;
+};

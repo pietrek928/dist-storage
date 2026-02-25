@@ -9,8 +9,9 @@ import "minion.proto";
 message MessageData {
   bytes recipient_id = 1;
   oneof m {
-    net.HolePunchParameters hole_punch = 2;
-    minion.Register minion_register = 3;
+    minion.Register minion_register = 2;
+    net.HolePunchParameters hole_punch = 3;
+    net.ListenParameters listen = 4;
   };
 };
 
