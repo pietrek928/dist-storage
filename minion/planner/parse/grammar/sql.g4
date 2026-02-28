@@ -1,22 +1,152 @@
 grammar sql;
 
-// --- PARSER RULES (The Grammar) ---
-// The root rule. Every query must end with an End Of File (EOF).
-query: selectStatement EOF ;
+// =====================================================================
+// PARSER RULES
+// =====================================================================
 
-selectStatement: SELECT columnList FROM tableName ;
+// The entry point. WITH clauses can apply to SELECT, UPDATE, or DELETE
+query: withClause? statement EOF ;
 
-// A column list is either a single identifier, multiple comma-separated identifiers, or a star.
-columnList: IDENTIFIER (',' IDENTIFIER)* | '*' ;
+withClause: WITH cte (',' cte)* ;
+cte: identifier AS '(' queryExpression ')' ;
 
-tableName: IDENTIFIER ;
+// --- Statement Router ---
+statement
+    : queryExpression                                           # SelectStmt
+    | updateStatement                                           # UpdateStmt
+    | deleteStatement                                           # DeleteStmt
+    ;
 
-// --- LEXER RULES (The Tokens) ---
-SELECT: [sS][eE][lL][eE][cC][tT] ;  // Case-insensitive 'SELECT'
-FROM: [fF][rR][oO][mM] ;            // Case-insensitive 'FROM'
+// --- 1. SELECT Statements ---
+queryExpression: selectStatement (UNION ALL? selectStatement)* ;
 
-// An identifier starts with a letter/underscore, followed by letters/numbers/underscores
+selectStatement:
+    SELECT selectElements
+    FROM relation joinClause* (WHERE expression)?
+    (GROUP BY expressionList)?
+    (LIMIT limitExpr=expression)?
+    (OFFSET offsetExpr=expression)?
+    ;
+
+selectElements: '*' | selectElement (',' selectElement)* ;
+selectElement: expression (AS? identifier)? ;
+expressionList: expression (',' expression)* ;
+
+relation
+    : identifier (AS? identifier)?
+    | '(' queryExpression ')' (AS? identifier)?
+    ;
+
+joinType: (INNER | LEFT | RIGHT | FULL) ;
+joinClause: joinType? JOIN relation ON expression ;
+
+// --- 2. UPDATE Statements ---
+updateStatement:
+    UPDATE identifier SET assignmentList (WHERE expression)?
+    ;
+
+assignmentList: assignment (',' assignment)* ;
+assignment: identifier '=' expression ;
+
+// --- 3. DELETE Statements ---
+deleteStatement:
+    DELETE FROM identifier (WHERE expression)?
+    ;
+
+// --- Data Types ---
+dataType: INT | FLOAT | BOOL | VARCHAR | STRING ;
+
+// --- Expressions & Precedence ---
+expression
+    : '(' expression ')'                                        # ParenthesizedExpr
+    | '(' queryExpression ')'                                   # SubqueryExpr
+    | functionCall                                              # FunctionExpr
+    | identifier                                                # ColumnExpr
+    | literal                                                   # LiteralExpr
+    | left=expression '::' dataType                             # CastExpr
+    | op=(NOT | '~') expression                                 # NotExpr
+    | left=expression op=('*' | '/') right=expression           # MulDivExpr
+    | left=expression op=('+' | '-') right=expression           # AddSubExpr
+    | left=expression IS notOp=NOT? NULL_KW                     # IsNullExpr
+    | left=expression notOp=NOT? IN '(' (queryExpression | expressionList) ')' # InExpr
+    | left=expression notOp=NOT? LIKE right=expression          # LikeExpr
+    | left=expression op=('=' | '<' | '>' | '<=' | '>=' | '!=' | '<>') right=expression # ComparisonExpr
+    | left=expression op=(AND | '&') right=expression           # AndExpr
+    | left=expression op=(XOR | '^') right=expression           # XorExpr
+    | left=expression op=(OR | '|') right=expression            # OrExpr
+    ;
+
+// --- Functions ---
+functionCall
+    : (MAX | MIN | SUM | SQRT | ABS | LN) '(' expression ')'    # StandardFunction
+    | COUNT '(' ('*' | expression) ')'                          # CountFunction
+    ;
+
+literal: STRING_LITERAL | NUMERIC_LITERAL | NULL_KW ;
+identifier: IDENTIFIER ;
+
+
+// =====================================================================
+// LEXER RULES (Tokens)
+// =====================================================================
+
+// DML Commands
+SELECT: [sS][eE][lL][eE][cC][tT] ;
+UPDATE: [uU][pP][dD][aA][tT][eE] ;
+SET:    [sS][eE][tT] ;
+DELETE: [dD][eE][lL][eE][tT][eE] ;
+
+// Core SQL
+FROM:   [fF][rR][oO][mM] ;
+WHERE:  [wW][hH][eE][rR][eE] ;
+GROUP:  [gG][rR][oO][uU][pP] ;
+BY:     [bB][yY] ;
+UNION:  [uU][nN][iI][oO][nN] ;
+ALL:    [aA][lL][lL] ;
+WITH:   [wW][iI][tT][hH] ;
+AS:     [aA][sS] ;
+
+// Logical & Conditionals
+AND:    [aA][nN][dD] ;
+OR:     [oO][rR] ;
+NOT:    [nN][oO][tT] ;
+XOR:    [xX][oO][rR] ;
+IN:     [iI][nN] ;
+LIKE:   [lL][iI][kK][eE] ;
+IS:     [iI][sS] ;
+NULL_KW:[nN][uU][lL][lL] ;
+
+// Data Types
+INT:    [iI][nN][tT] ;
+FLOAT:  [fF][lL][oO][aA][tT] ;
+BOOL:   [bB][oO][oO][lL] ;
+VARCHAR:[vV][aA][rR][cC][hH][aA][rR] ;
+STRING: [sS][tT][rR][iI][nN][gG] ;
+
+// Joins
+JOIN:   [jJ][oO][iI][nN] ;
+INNER:  [iI][nN][nN][eE][rR] ;
+LEFT:   [lL][eE][fF][tT] ;
+RIGHT:  [rR][iI][gG][hH][tT] ;
+FULL:   [fF][uU][lL][lL] ;
+ON:     [oO][nN] ;
+
+// Modifiers
+LIMIT:  [lL][iI][mM][iI][tT] ;
+OFFSET: [oO][fF][fF][sS][eE][tT] ;
+
+// Functions
+MAX:    [mM][aA][xX] ;
+MIN:    [mM][iI][nN] ;
+SUM:    [sS][uU][mM] ;
+COUNT:  [cC][oO][uU][nN][tT] ;
+SQRT:   [sS][qQ][rR][tT] ;
+ABS:    [aA][bB][sS] ;
+LN:     [lL][nN] ;
+
+// Identifiers & Primitives
 IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]* ;
+NUMERIC_LITERAL: [0-9]+ ('.' [0-9]+)? ;
+STRING_LITERAL: '\'' (~['])*? '\'' ;
 
-// Ignore spaces, tabs, and newlines entirely
 WS: [ \t\r\n]+ -> skip ;

@@ -14,8 +14,9 @@ enum ColumnOperation {
     ABS = 7;  // |x|
     SQRT = 8;
     EXP = 9;
-    LN = 10;
-    LOG = 11;
+    POW = 10;
+    LN = 11;
+    LOG = 12;
 
     NOT = 30;
     AND = 31;
@@ -46,18 +47,19 @@ enum ColumnOperation {
     MAX = 105;
     SUM = 106;
     COUNT = 107;
-    AVG = 108;
-    MEDIAN = 109;
-    STD = 110;
-    VAR = 111;
+    COUNT_DISTINCT = 108;
+    AVG = 109;
+    MEDIAN = 110;
+    STD = 111;
+    VAR = 112;
 
     FILTER = 250;
     OFFSET = 251;
     LIMIT = 252;
-    INNER_JOIN = 253;
-    OUTER_JOIN = 254;
-    LEFT_JOIN = 255;
-    RIGHT_JOIN = 256;
+    GROUP = 253;
+    JOIN = 254;
+    ORDER = 255;
+    UNION = 256;
 
     // TODO: Low level processing ops
 

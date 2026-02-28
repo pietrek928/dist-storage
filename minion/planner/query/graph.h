@@ -13,6 +13,7 @@
 
 
 using node_t = int;
+using node_hash_t = uint64_t;
 
 typedef struct {
     query::ColumnOperation op;
@@ -34,6 +35,8 @@ typedef struct {
     std::vector<std::string> column_names;
     std::vector<std::string> df_names = {"const"};
     std::vector<Operation> operations;
+
+    // TODO: graph
 } QueryGraph;
 
 
@@ -196,6 +199,33 @@ query::ColumnOperation getNegatedOperation(
     }
 }
 
+bool isCummutative(
+    query::ColumnOperation op
+) {
+    switch (op) {
+        case query::ColumnOperation::AND:
+        case query::ColumnOperation::NAND:
+        case query::ColumnOperation::OR:
+        case query::ColumnOperation::NOR:
+        case query::ColumnOperation::XOR:
+        case query::ColumnOperation::XNOR:
+        case query::ColumnOperation::ADD:
+        case query::ColumnOperation::MUL:
+        case query::ColumnOperation::MIN:
+        case query::ColumnOperation::MAX:
+        case query::ColumnOperation::AVG:
+        case query::ColumnOperation::COUNT:
+        case query::ColumnOperation::COUNT_DISTINCT:
+        case query::ColumnOperation::SUM:
+        case query::ColumnOperation::MEDIAN:
+        case query::ColumnOperation::VAR:
+        case query::ColumnOperation::STD:
+            return true;
+        default:
+            return false;
+    }
+}
+
 void fillVisited(
     const std::vector<std::vector<node_t>> &graph_mapping,
     std::vector<node_t> &visited,
@@ -229,6 +259,24 @@ std::map<node_t, node_t> visitedLeaveMap(
         newMapping[visitedNodes[i]] = i;
     }
     return newMapping;
+}
+
+std::vector<node_t> visitedNodesOrder(
+    const std::vector<node_t> &visited
+) {
+    std::vector<node_t> nodesOrder;
+    for (node_t i = 0; i < visited.size(); i++) {
+        if (visited[i]) {
+            nodesOrder.push_back(i);
+        }
+    }
+    std::sort(
+        nodesOrder.begin(), nodesOrder.end(),
+        [&visited](node_t a, node_t b) {
+            return visited[a] > visited[b];
+        }
+    );
+    return nodesOrder;
 }
 
 std::vector<std::vector<node_t>> mapMappingGraph(
@@ -265,4 +313,60 @@ std::vector<Operation> mapOperations(
         newOperations[m.second] = operations[m.first];
     }
     return newOperations;
+}
+
+node_hash_t hashChildrenPositional(
+    const node_t *children, int nchildren,
+    const std::vector<node_hash_t> &nodeHashes
+) {
+    node_hash_t hash = 583747;
+    for (int i = 0; i < nchildren; i++) {
+        hash = (hash + nodeHashes[children[i]] + 82937) * 4565;
+    }
+    return hash;
+}
+
+node_hash_t hashChildrenSet(
+    const node_t *chindren, int nchildren,
+    const std::vector<node_hash_t> &nodeHashes
+) {
+    node_hash_t hash = 583747;
+    for (int i = 0; i < nchildren; i++) {
+        hash *= hash + 989673;
+    }
+    return hash;
+}
+
+node_hash_t hashOperationParams(const Operation &op) {
+    node_hash_t hash = 45643;
+    hash = hash * 5667 + op.op;
+    hash = hash * 5453 + op.col;
+    hash = hash * 6357 + op.df;
+    hash = hash * 8763 + op.type;
+    hash = hash * 5 + op.array * 3;
+    return hash;
+}
+
+void fillNodeHashes(
+    const std::vector<std::vector<node_t>> &graph_mapping,
+    const std::vector<Operation> &operations,
+    const std::vector<node_t> &nodesOrder,
+    std::vector<node_hash_t> &nodeHashes
+) {
+    for (const auto &node : nodesOrder) {
+        const auto &vec = graph_mapping[node];
+        node_hash_t child_hash = 0;
+        if (!vec.empty()) {
+            if (!isCummutative(operations[node].op)) {
+                child_hash = hashChildrenPositional(
+                    vec.data(), vec.size(), nodeHashes
+                );
+            } else {
+                child_hash = hashChildrenSet(
+                    vec.data(), vec.size(), nodeHashes
+                );
+            }
+        }
+        nodeHashes[node] = hashOperationParams(operations[node]) + child_hash;
+    }
 }
