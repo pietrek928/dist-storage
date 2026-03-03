@@ -82,7 +82,7 @@ functionCall
     | COUNT '(' ('*' | expression) ')'                          # CountFunction
     ;
 
-literal: STRING_LITERAL | NUMERIC_LITERAL | NULL_KW ;
+literal: STRING_LITERAL | INT_LITERAL | FLOAT_LITERAL | TRUE | FALSE | NULL_KW ;
 identifier: IDENTIFIER ;
 
 
@@ -115,6 +115,8 @@ IN:     [iI][nN] ;
 LIKE:   [lL][iI][kK][eE] ;
 IS:     [iI][sS] ;
 NULL_KW:[nN][uU][lL][lL] ;
+TRUE:   [tT][rR][uU][eE] ;
+FALSE:  [fF][aA][lL][sS][eE] ;
 
 // Data Types
 INT:    [iI][nN][tT] ;
@@ -145,8 +147,9 @@ ABS:    [aA][bB][sS] ;
 LN:     [lL][nN] ;
 
 // Identifiers & Primitives
-IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]* ;
-NUMERIC_LITERAL: [0-9]+ ('.' [0-9]+)? ;
-STRING_LITERAL: '\'' (~['])*? '\'' ;
+IDENTIFIER: [\p{L}_] [\p{L}\p{Nd}_]* ;
+FLOAT_LITERAL: [0-9]+ '.' [0-9]+ ;
+INT_LITERAL:   [0-9]+ ;
+STRING_LITERAL: '\'' ( ~['] | '\'\'' )*? '\'' ;
 
 WS: [ \t\r\n]+ -> skip ;

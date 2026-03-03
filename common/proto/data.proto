@@ -23,6 +23,12 @@ enum ValueType {
     JSON = 14;
 };
 
+enum SequenceType {
+    ANY = 0;
+    SINGLE = 1;
+    ARRAY = 2;
+};
+
 message BoolColumn { bytes data = 1; };
 message Int8Column { bytes data = 1; };
 message UInt8Column { bytes data = 1; };

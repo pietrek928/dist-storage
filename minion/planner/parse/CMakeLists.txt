@@ -39,7 +39,7 @@ endif()
 # PART 2: Generate C++ Code from the .g4 Grammar
 # ------------------------------------------------------------------
 set(GRAMMAR_FILE "${CMAKE_CURRENT_SOURCE_DIR}/grammar/sql.g4")
-set(GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+set(GENERATED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/generated")
 
 add_custom_command(
     OUTPUT
@@ -72,3 +72,6 @@ target_include_directories(query_parser_obj PRIVATE
 # Note: Using PUBLIC here so whatever links against these objects later also knows about ANTLR
 # target_link_libraries(query_parser_obj PUBLIC antlr4_static)
 target_link_libraries(query_parser_obj PUBLIC antlr4_static)
+target_link_libraries(query_parser_obj PRIVATE
+    grpc++
+)

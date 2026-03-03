@@ -43,6 +43,10 @@ enum ColumnOperation {
     BETWEEN = 64;
     NOT_BETWEEN = 65;
 
+    NULL_ = 90;
+    TRUE = 91;
+    FALSE = 92;
+
     MIN = 104;
     MAX = 105;
     SUM = 106;
@@ -53,13 +57,17 @@ enum ColumnOperation {
     STD = 111;
     VAR = 112;
 
-    FILTER = 250;
-    OFFSET = 251;
-    LIMIT = 252;
-    GROUP = 253;
-    JOIN = 254;
-    ORDER = 255;
-    UNION = 256;
+    ARRAY = 130;
+
+    LOAD = 250;
+    DF = 251;
+    FILTER = 252;
+    OFFSET = 253;
+    LIMIT = 254;
+    GROUP = 255;
+    JOIN = 256;
+    ORDER = 257;
+    UNION = 258;
 
     // TODO: Low level processing ops
 

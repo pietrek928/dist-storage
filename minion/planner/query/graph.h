@@ -14,16 +14,19 @@
 
 using node_t = int;
 using node_hash_t = uint64_t;
+constexpr node_t NODE_NONE = -1;
 
-typedef struct {
+
+typedef struct Operation {
     query::ColumnOperation op;
-    node_t col;
+    node_t name = NODE_NONE;
+    node_t const_id = NODE_NONE;
     node_t df;
     data::ValueType type;
-    bool array;
+    data::SequenceType sequence;
 } Operation;
 
-typedef struct {
+typedef struct QueryGraph {
     std::vector<int64_t> int64_constants;
     std::vector<std::vector<int64_t>> int64_array_constants;
     std::vector<double> float64_constants;
@@ -36,45 +39,113 @@ typedef struct {
     std::vector<std::string> df_names = {"const"};
     std::vector<Operation> operations;
 
-    // TODO: graph
+    std::vector<std::vector<node_t>> graph_mapping;
 } QueryGraph;
 
 
-node_t appendInt64Constant(QueryGraph &graph, const std::string &name, int64_t value) {
+node_t appendInt64Constant(QueryGraph &graph, int64_t value) {
     node_t const_id = graph.int64_constants.size();
     graph.int64_constants.push_back(value);
-    graph.column_names.push_back(name);
+    node_t node_id = graph.operations.size();
+    graph.graph_mapping.emplace_back();
     graph.operations.emplace_back(Operation{
         .op = query::ColumnOperation::CONST,
-        .col = const_id,
+        .const_id = const_id,
         .df = 0,  // df=0 -> constant
         .type = data::ValueType::Int64,
-        .array = false,
+        .sequence = data::SequenceType::SINGLE,
     });
-    return const_id;
+    return node_id;
 }
 
-node_t appendFloat64Constant(QueryGraph &graph, const std::string &name, double value) {
+node_t appendFloat64Constant(QueryGraph &graph, double value) {
     node_t const_id = graph.float64_constants.size();
     graph.float64_constants.push_back(value);
-    graph.column_names.push_back(name);
+    node_t node_id = graph.operations.size();
+    graph.graph_mapping.emplace_back();
     graph.operations.emplace_back(Operation{
         .op = query::ColumnOperation::CONST,
-        .col = const_id,
+        .const_id = const_id,
         .df = 0,  // df=0 -> constant
         .type = data::ValueType::Float64,
-        .array = false,
+        .sequence = data::SequenceType::SINGLE,
     });
-    return const_id;
+    return node_id;
+}
+
+node_t appendStringConstant(QueryGraph &graph, const std::string& value) {
+    node_t const_id = graph.string_constants.size();
+    graph.string_constants.push_back(value);
+    node_t node_id = graph.operations.size();
+    graph.graph_mapping.emplace_back();
+    graph.operations.emplace_back(Operation{
+        .op = query::ColumnOperation::CONST,
+        .const_id = const_id,
+        .df = 0,  // df=0 -> constant
+        .type = data::ValueType::String,
+        .sequence = data::SequenceType::SINGLE,
+    });
+    return node_id;
+}
+
+// node_t appendNULL(QueryGraph &graph) {
+//     node_t node_id = graph.operations.size();
+//     graph.graph_mapping.emplace_back();
+//     graph.operations.emplace_back(Operation{
+//         .op = query::ColumnOperation::NULL_,
+//         .df = 0,  // df=0 -> constant
+//         .type = data::ValueType::Any,
+//         .sequence = data::SequenceType::SINGLE,
+//     });
+//     return node_id;
+// }
+
+// node_t appendTrue(QueryGraph &graph) {
+//     node_t node_id = graph.operations.size();
+//     graph.graph_mapping.emplace_back();
+//     graph.operations.emplace_back(Operation{
+//         .op = query::ColumnOperation::TRUE,
+//         .df = 0,  // df=0 -> constant
+//         .type = data::ValueType::Bool,
+//         .sequence = data::SequenceType::SINGLE,
+//     });
+//     return node_id;
+// }
+
+// node_t appendFalse(QueryGraph &graph) {
+//     node_t node_id = graph.operations.size();
+//     graph.graph_mapping.emplace_back();
+//     graph.operations.emplace_back(Operation{
+//         .op = query::ColumnOperation::FALSE,
+//         .df = 0,  // df=0 -> constant
+//         .type = data::ValueType::Bool,
+//         .sequence = data::SequenceType::SINGLE,
+//     });
+//     return node_id;
+// }
+
+node_t appendNode(
+    QueryGraph &graph, node_t df, query::ColumnOperation op, data::ValueType type,
+    const std::vector<node_t> &args = {}, data::SequenceType sequence = data::SequenceType::SINGLE
+) {
+    node_t node_id = graph.operations.size();
+    graph.graph_mapping.emplace_back(args);
+    graph.operations.emplace_back(Operation{
+        .op = op,
+        .df = df,
+        .type = type,
+        .sequence = data::SequenceType::SINGLE,
+    });
+    return node_id;
 }
 
 template<typename Tvalue>
 Tvalue getNumericConstant(const QueryGraph &graph, const Operation &const_op) {
-    auto const_num = const_op.col;
+    auto const_num = const_op.const_id;
     switch (const_op.type) {
         case data::ValueType::Int64:
-            if (const_op.array) {
-                if (const_num >= graph.int64_array_constants.size()) {
+            if (const_op.sequence == data::SequenceType::ARRAY) {
+                if (const_num < 0 || const_num >= graph.int64_array_constants.size()) {
                     throw std::invalid_argument("Invalid int64 array constant id " + std::to_string(const_num));
                 }
                 auto &array = graph.int64_array_constants[const_num];
@@ -83,14 +154,14 @@ Tvalue getNumericConstant(const QueryGraph &graph, const Operation &const_op) {
                 }
                 return array[0];
             } else {
-                if (const_num >= graph.int64_constants.size()) {
+                if (const_num < 0 || const_num >= graph.int64_constants.size()) {
                     throw std::invalid_argument("Invalid int64 constant id " + std::to_string(const_num));
                 }
                 return graph.int64_constants[const_num];
             }
         case data::ValueType::Float64:
-            if (const_op.array) {
-                if (const_num >= graph.float64_array_constants.size()) {
+            if (const_op.sequence == data::SequenceType::ARRAY) {
+                if (const_num < 0 || const_num >= graph.float64_array_constants.size()) {
                     throw std::invalid_argument("Invalid float64 array constant id " + std::to_string(const_num));
                 }
                 auto &array = graph.float64_array_constants[const_num];
@@ -99,7 +170,7 @@ Tvalue getNumericConstant(const QueryGraph &graph, const Operation &const_op) {
                 }
                 return array[0];
             } else {
-                if (const_num >= graph.float64_constants.size()) {
+                if (const_num < 0 || const_num >= graph.float64_constants.size()) {
                     throw std::invalid_argument("Invalid float64 constant id " + std::to_string(const_num));
                     }
                 return graph.float64_constants[const_num];
@@ -123,6 +194,18 @@ std::vector<std::vector<node_t>> getGraphMapping(
         graph_mapping[edge.first].push_back(edge.second);
     }
     return graph_mapping;
+}
+
+std::vector<std::vector<node_t>> revertGraphMapping(
+    const std::vector<std::vector<node_t>> &graph_mapping
+) {
+    std::vector<std::vector<node_t>> resersed(graph_mapping.size());
+    for (node_t i = 0; i < graph_mapping.size(); i++) {
+        for (const auto &j : graph_mapping[i]) {
+            resersed[j].push_back(i);
+        }
+    }
+    return resersed;
 }
 
 std::vector<std::pair<node_t, node_t>> getEdgesList(
@@ -149,6 +232,8 @@ query::ColumnOperation getNegatedOperation(
     switch (op) {
         case query::ColumnOperation::NOT:
             return query::ColumnOperation::NOP;
+        case query::ColumnOperation::NULL_:
+            return query::ColumnOperation::NULL_;
         case query::ColumnOperation::AND:
             return query::ColumnOperation::NAND;
         case query::ColumnOperation::OR:
