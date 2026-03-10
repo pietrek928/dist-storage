@@ -44,7 +44,7 @@ message StringColumn { repeated string data = 1; };
 message BytesColumn { repeated bytes data = 1; };
 message JSONColumn { repeated google.protobuf.Struct data = 1; };
 
-message Column {
+message ColumnData {
     string name = 1;
     oneof data {
         BoolColumn bool = 2;
@@ -64,7 +64,23 @@ message Column {
     }
 };
 
-message DataFrame {
-    // TODO: id ?
-    repeated Column columns = 1;
+message ColumnSchema {
+    string name = 1;
+    ValueType type = 2;
+};
+
+message TableData {
+  // TODO: id ?
+  repeated ColumnData columns = 1;
+};
+
+message TableSchema {
+    string name = 1;
+    string id = 2;
+    repeated ColumnSchema columns = 3;
+};
+
+message DBSchema {
+    string name = 1;
+    repeated TableSchema tables = 2;
 };

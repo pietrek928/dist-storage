@@ -40,8 +40,6 @@ enum ColumnOperation {
     NOT_ILIKE = 61;
     IS_NULL = 62;
     IS_NOT_NULL = 63;
-    BETWEEN = 64;
-    NOT_BETWEEN = 65;
 
     NULL_ = 90;
     TRUE = 91;
@@ -57,13 +55,12 @@ enum ColumnOperation {
     STD = 111;
     VAR = 112;
 
-    ARRAY = 130;
+    COLUMN = 250;
 
-    LOAD = 250;
-    DF = 251;
-    FILTER = 252;
-    OFFSET = 253;
-    LIMIT = 254;
+    TABLE = 251;
+    DF = 252;
+    FILTER = 253;
+    RANGE = 254;
     GROUP = 255;
     JOIN = 256;
     ORDER = 257;

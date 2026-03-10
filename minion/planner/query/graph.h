@@ -21,8 +21,8 @@ typedef struct Operation {
     query::ColumnOperation op;
     node_t name = NODE_NONE;
     node_t const_id = NODE_NONE;
-    node_t df;
-    data::ValueType type;
+    node_t df = NODE_NONE;
+    data::ValueType type = data::ValueType::Any;
     data::SequenceType sequence;
 } Operation;
 
@@ -35,12 +35,31 @@ typedef struct QueryGraph {
     std::vector<std::vector<std::string>> string_array_constants;
     // TODO: handle JSON
 
-    std::vector<std::string> column_names;
-    std::vector<std::string> df_names = {"const"};
+    std::vector<std::string> names;
     std::vector<Operation> operations;
 
     std::vector<std::vector<node_t>> graph_mapping;
 } QueryGraph;
+
+
+node_t appendName(QueryGraph &graph, const std::string &name) {
+    node_t name_id = graph.names.size();
+    graph.names.push_back(name);
+    return name_id;
+}
+
+void setNodeName(QueryGraph &graph, node_t node_id, const std::string &name) {
+    node_t name_id = appendName(graph, name);
+    graph.operations[node_id].name = name_id;
+}
+
+std::string getNodeName(const QueryGraph &graph, node_t node_id) {
+    node_t name_id = graph.operations[node_id].name;
+    if (name_id == NODE_NONE) {
+        return "";
+    }
+    return graph.names[name_id];
+}
 
 
 node_t appendInt64Constant(QueryGraph &graph, int64_t value) {
@@ -88,45 +107,53 @@ node_t appendStringConstant(QueryGraph &graph, const std::string& value) {
     return node_id;
 }
 
-// node_t appendNULL(QueryGraph &graph) {
-//     node_t node_id = graph.operations.size();
-//     graph.graph_mapping.emplace_back();
-//     graph.operations.emplace_back(Operation{
-//         .op = query::ColumnOperation::NULL_,
-//         .df = 0,  // df=0 -> constant
-//         .type = data::ValueType::Any,
-//         .sequence = data::SequenceType::SINGLE,
-//     });
-//     return node_id;
-// }
+node_t appendColumn(QueryGraph &graph, const std::string &name, data::ValueType type) {
+    node_t name_id = appendName(graph, name);
+    node_t node_id = graph.operations.size();
+    graph.graph_mapping.emplace_back();
+    graph.operations.emplace_back(Operation{
+        .op = query::ColumnOperation::COLUMN,
+        .name = name_id,
+        .type = type,
+        .sequence = data::SequenceType::ARRAY,
+    });
+    return node_id;
+}
 
-// node_t appendTrue(QueryGraph &graph) {
-//     node_t node_id = graph.operations.size();
-//     graph.graph_mapping.emplace_back();
-//     graph.operations.emplace_back(Operation{
-//         .op = query::ColumnOperation::TRUE,
-//         .df = 0,  // df=0 -> constant
-//         .type = data::ValueType::Bool,
-//         .sequence = data::SequenceType::SINGLE,
-//     });
-//     return node_id;
-// }
+node_t appendTable(
+    QueryGraph &graph,
+    const std::string &name,
+    const std::vector<node_t> &col_node_ids
+) {
+    node_t name_id = appendName(graph, name);
+    node_t node_id = graph.operations.size();
+    graph.graph_mapping.emplace_back(col_node_ids);
+    graph.operations.emplace_back(Operation{
+        .op = query::ColumnOperation::TABLE,
+        .name = name_id,
+        .sequence = data::SequenceType::ARRAY,
+    });
+    return node_id;
+}
 
-// node_t appendFalse(QueryGraph &graph) {
-//     node_t node_id = graph.operations.size();
-//     graph.graph_mapping.emplace_back();
-//     graph.operations.emplace_back(Operation{
-//         .op = query::ColumnOperation::FALSE,
-//         .df = 0,  // df=0 -> constant
-//         .type = data::ValueType::Bool,
-//         .sequence = data::SequenceType::SINGLE,
-//     });
-//     return node_id;
-// }
+void loadTableNames(
+    std::map<std::string, node_t> &ctx,
+    const QueryGraph &graph, node_t table_node_id, std::string table_name = ""
+) {
+    for (const auto &col_node_id : graph.graph_mapping[table_node_id]) {
+        node_t name_id = graph.operations[col_node_id].name;
+        if (name_id != NODE_NONE) {
+            ctx[graph.names[name_id]] = col_node_id;
+            if (!table_name.empty()) {
+                ctx[table_name + "." + graph.names[name_id]] = col_node_id;
+            }
+        }
+    }
+}
 
 node_t appendNode(
     QueryGraph &graph, node_t df, query::ColumnOperation op, data::ValueType type,
-    const std::vector<node_t> &args = {}, data::SequenceType sequence = data::SequenceType::SINGLE
+    const std::vector<node_t> args = {}, data::SequenceType sequence = data::SequenceType::SINGLE
 ) {
     node_t node_id = graph.operations.size();
     graph.graph_mapping.emplace_back(args);
@@ -274,10 +301,6 @@ query::ColumnOperation getNegatedOperation(
             return query::ColumnOperation::IS_NOT_NULL;
         case query::ColumnOperation::IS_NOT_NULL:
             return query::ColumnOperation::IS_NULL;
-        case query::ColumnOperation::BETWEEN:
-            return query::ColumnOperation::NOT_BETWEEN;
-        case query::ColumnOperation::NOT_BETWEEN:
-            return query::ColumnOperation::BETWEEN;
 
         default:
             return query::ColumnOperation::INVALID;
@@ -305,6 +328,23 @@ bool isCummutative(
         case query::ColumnOperation::MEDIAN:
         case query::ColumnOperation::VAR:
         case query::ColumnOperation::STD:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool isTableOperation(
+    query::ColumnOperation op
+) {
+    switch (op) {
+        case query::ColumnOperation::TABLE:
+        case query::ColumnOperation::DF:
+        case query::ColumnOperation::JOIN:
+        case query::ColumnOperation::FILTER:
+        case query::ColumnOperation::RANGE:
+        case query::ColumnOperation::ORDER:
+        case query::ColumnOperation::UNION:
             return true;
         default:
             return false;
@@ -425,10 +465,11 @@ node_hash_t hashChildrenSet(
 node_hash_t hashOperationParams(const Operation &op) {
     node_hash_t hash = 45643;
     hash = hash * 5667 + op.op;
-    hash = hash * 5453 + op.col;
+    hash = hash * 5453 + op.name;
+    hash = hash * 4567 + op.const_id;
     hash = hash * 6357 + op.df;
     hash = hash * 8763 + op.type;
-    hash = hash * 5 + op.array * 3;
+    hash = hash * 5 + op.sequence * 3;
     return hash;
 }
 

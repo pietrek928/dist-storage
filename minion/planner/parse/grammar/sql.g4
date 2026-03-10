@@ -21,24 +21,23 @@ statement
 queryExpression: selectStatement (UNION ALL? selectStatement)* ;
 
 selectStatement:
-    SELECT selectElements
-    FROM relation joinClause* (WHERE expression)?
-    (GROUP BY expressionList)?
+    SELECT selectElement (',' selectElement)*
+    (FROM baseTable=relation joins+=joinClause*)?
+    (WHERE whereExpr=expression)?
+    (GROUP BY groupByExprs+=expression (',' groupByExprs+=expression)*)?
     (LIMIT limitExpr=expression)?
     (OFFSET offsetExpr=expression)?
     ;
 
-selectElements: '*' | selectElement (',' selectElement)* ;
-selectElement: expression (AS? identifier)? ;
-expressionList: expression (',' expression)* ;
-
-relation
-    : identifier (AS? identifier)?
-    | '(' queryExpression ')' (AS? identifier)?
+selectElement
+    : globalStar='*'                             // Global wildcard
+    | tableName=identifier '.' tableStar='*'     // Table-specific wildcard
+    | expression (AS? alias=identifier)?         // Standard expression / column
     ;
 
+relation: identifier (AS? alias=identifier)? | '(' queryExpression ')' (AS? alias=identifier)? ;
 joinType: (INNER | LEFT | RIGHT | FULL) ;
-joinClause: joinType? JOIN relation ON expression ;
+joinClause: joinType? JOIN relation ON onExpr=expression ;
 
 // --- 2. UPDATE Statements ---
 updateStatement:
@@ -61,19 +60,20 @@ expression
     : '(' expression ')'                                        # ParenthesizedExpr
     | '(' queryExpression ')'                                   # SubqueryExpr
     | functionCall                                              # FunctionExpr
-    | identifier                                                # ColumnExpr
+    | (tableName=identifier '.')? columnName=identifier         # ColumnExpr
     | literal                                                   # LiteralExpr
     | left=expression '::' dataType                             # CastExpr
-    | op=(NOT | '~') expression                                 # NotExpr
+    | op=(NOT | '~' | '!') expression                           # NotExpr
     | left=expression op=('*' | '/') right=expression           # MulDivExpr
     | left=expression op=('+' | '-') right=expression           # AddSubExpr
     | left=expression IS notOp=NOT? NULL_KW                     # IsNullExpr
-    | left=expression notOp=NOT? IN '(' (queryExpression | expressionList) ')' # InExpr
-    | left=expression notOp=NOT? LIKE right=expression          # LikeExpr
-    | left=expression op=('=' | '<' | '>' | '<=' | '>=' | '!=' | '<>') right=expression # ComparisonExpr
-    | left=expression op=(AND | '&') right=expression           # AndExpr
+    | left=expression notOp=NOT? IN '(' ( queryExpression | expression (',' expression)* ) ')' # InExpr
+    | left=expression notOp=NOT? (LIKE | ILIKE) right=expression # LikeExpr
+    | left=expression notOp=NOT? BETWEEN lower=expression AND upper=expression # BetweenExpr
+    | left=expression (ops+=('=' | '==' | '<' | '>' | '<=' | '>=' | '!=' | '<>') rights+=expression)+ # ComparisonExpr
+    | left=expression op=(AND | '&' | '&&') right=expression    # AndExpr
     | left=expression op=(XOR | '^') right=expression           # XorExpr
-    | left=expression op=(OR | '|') right=expression            # OrExpr
+    | left=expression op=(OR | '|' | '||') right=expression     # OrExpr
     ;
 
 // --- Functions ---
@@ -106,14 +106,16 @@ ALL:    [aA][lL][lL] ;
 WITH:   [wW][iI][tT][hH] ;
 AS:     [aA][sS] ;
 
-// Logical & Conditionals
+// Logical & Conditionals (UPDATED: Added BETWEEN and ILIKE)
 AND:    [aA][nN][dD] ;
 OR:     [oO][rR] ;
 NOT:    [nN][oO][tT] ;
 XOR:    [xX][oO][rR] ;
 IN:     [iI][nN] ;
 LIKE:   [lL][iI][kK][eE] ;
+ILIKE:  [iI][lL][iI][kK][eE] ;
 IS:     [iI][sS] ;
+BETWEEN:[bB][eE][tT][wW][eE][eE][nN] ;
 NULL_KW:[nN][uU][lL][lL] ;
 TRUE:   [tT][rR][uU][eE] ;
 FALSE:  [fF][aA][lL][sS][eE] ;
