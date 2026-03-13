@@ -5,9 +5,7 @@ grammar sql;
 // =====================================================================
 
 // The entry point. WITH clauses can apply to SELECT, UPDATE, or DELETE
-query: withClause? statement EOF ;
-
-withClause: WITH cte (',' cte)* ;
+query: (WITH cte (',' cte)*)? statement EOF ;
 cte: identifier AS '(' queryExpression ')' ;
 
 // --- Statement Router ---
@@ -25,6 +23,7 @@ selectStatement:
     (FROM baseTable=relation joins+=joinClause*)?
     (WHERE whereExpr=expression)?
     (GROUP BY groupByExprs+=expression (',' groupByExprs+=expression)*)?
+    (ORDER BY sortItems+=sortItem (',' sortItems+=sortItem)*)?
     (LIMIT limitExpr=expression)?
     (OFFSET offsetExpr=expression)?
     ;
@@ -34,6 +33,7 @@ selectElement
     | tableName=identifier '.' tableStar='*'     // Table-specific wildcard
     | expression (AS? alias=identifier)?         // Standard expression / column
     ;
+sortItem: expression dir=(ASC | DESC)? ;
 
 relation: identifier (AS? alias=identifier)? | '(' queryExpression ')' (AS? alias=identifier)? ;
 joinType: (INNER | LEFT | RIGHT | FULL) ;
@@ -101,10 +101,14 @@ FROM:   [fF][rR][oO][mM] ;
 WHERE:  [wW][hH][eE][rR][eE] ;
 GROUP:  [gG][rR][oO][uU][pP] ;
 BY:     [bB][yY] ;
+ORDER:  [oO][rR][dD][eE][rR] ;
 UNION:  [uU][nN][iI][oO][nN] ;
 ALL:    [aA][lL][lL] ;
 WITH:   [wW][iI][tT][hH] ;
 AS:     [aA][sS] ;
+ASC:    [aA][sS][cC];
+DESC:   [dD][eE][sS][cC];
+
 
 // Logical & Conditionals (UPDATED: Added BETWEEN and ILIKE)
 AND:    [aA][nN][dD] ;
@@ -154,4 +158,6 @@ FLOAT_LITERAL: [0-9]+ '.' [0-9]+ ;
 INT_LITERAL:   [0-9]+ ;
 STRING_LITERAL: '\'' ( ~['] | '\'\'' )*? '\'' ;
 
+SINGLE_LINE_COMMENT: ('--' | '//' | '#') ~[\r\n]* -> skip ;
+MULTI_LINE_COMMENT: '/*' .*? '*/' -> skip ;
 WS: [ \t\r\n]+ -> skip ;

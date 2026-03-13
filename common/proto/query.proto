@@ -56,15 +56,15 @@ enum ColumnOperation {
     VAR = 112;
 
     COLUMN = 250;
+    DESC = 251;
 
-    TABLE = 251;
-    DF = 252;
-    FILTER = 253;
-    RANGE = 254;
-    GROUP = 255;
-    JOIN = 256;
-    ORDER = 257;
-    UNION = 258;
+    TABLE = 261;
+    DF = 262;
+    FILTER = 263;
+    RANGE = 264;
+    GROUP = 265;
+    SORT = 266;
+    UNION = 267;
 
     // TODO: Low level processing ops
 

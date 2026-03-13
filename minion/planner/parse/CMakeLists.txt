@@ -56,7 +56,12 @@ add_custom_command(
 # PART 3: Build Your Object Files
 # ------------------------------------------------------------------
 # CHANGED: Using add_library with the OBJECT keyword instead of add_executable
-add_library(query_parser_obj OBJECT
+# add_library(query_parser_obj OBJECT
+#     "parse_query.cc"
+#     "${GENERATED_DIR}/sqlLexer.cpp"
+#     "${GENERATED_DIR}/sqlParser.cpp"
+# )
+add_executable(query_parser_obj  # executable for debug
     "parse_query.cc"
     "${GENERATED_DIR}/sqlLexer.cpp"
     "${GENERATED_DIR}/sqlParser.cpp"
@@ -74,4 +79,5 @@ target_include_directories(query_parser_obj PRIVATE
 target_link_libraries(query_parser_obj PUBLIC antlr4_static)
 target_link_libraries(query_parser_obj PRIVATE
     grpc++
+    my_proto_lib
 )

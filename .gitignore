@@ -15,3 +15,7 @@
 /_deps
 
 *.jar
+
+*.a
+*.obj
+*_obj

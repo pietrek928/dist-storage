@@ -224,6 +224,10 @@ class SqlVisitor : public sqlBaseVisitor {
 
 public:
 
+    const QueryGraph &getGraph() const {
+        return out_graph;
+    }
+
     std::any visitLiteral(sqlParser::LiteralContext *ctx) override {
         visitChildren(ctx);
 
@@ -275,14 +279,14 @@ public:
     }
 
     std::any visitAddSubExpr(sqlParser::AddSubExprContext *ctx) override {
-        appendOperation(
+        return appendOperation(
             ctx, ctx->op->getText(),
             {visitNode(ctx->left), visitNode(ctx->right)}
         );
     }
 
     std::any visitNotExpr(sqlParser::NotExprContext *ctx) override {
-        appendOperation(
+        return appendOperation(
             ctx, ctx->op->getText(),
             {visitNode(ctx->expression())}
         );
@@ -294,7 +298,7 @@ public:
             opString = "NOT " + opString;
         }
 
-        appendOperation(
+        return appendOperation(
             ctx,
             opString,
             {visitNode(ctx->left), visitNode(ctx->right)}
@@ -385,129 +389,218 @@ public:
     }
 
     std::any visitSelectStatement(sqlParser::SelectStatementContext *ctx) override {
-        exprTableContext.clear(); // TODO: stack those for nested select ?
-        exprVarContext.clear();
+        std::map<std::string, node_t> exprTableContextOld;
+        std::map<std::string, node_t> exprVarContextOld;
+        exprTableContextOld.swap(exprTableContext);
+        exprVarContextOld.swap(exprVarContext);
 
-        std::vector<node_t> filters;
+        try {
+            std::vector<node_t> filters;
 
-        // OFFSET
-        node_t offset_node_id = NODE_NONE;
-        if (ctx->offsetExpr) {
-            offset_node_id = visitNode(ctx->offsetExpr);
-        }
-
-        // LIMIT
-        node_t limit_node_id = NODE_NONE;
-        if (ctx->limitExpr) {
-            limit_node_id = visitNode(ctx->limitExpr);
-        }
-
-        // FROM
-        std::vector<node_t> table_node_ids;
-        if (ctx->baseTable) {
-            node_t table_node_id = visitNode(ctx->baseTable);
-            table_node_ids.push_back(table_node_id);
-            std::string table_alias = (
-                ctx->baseTable->alias
-                ? ctx->baseTable->alias->getText()
-                : getNodeName(out_graph, table_node_id)
-            );
-            loadTableNames(exprVarContext, out_graph, table_node_id, table_alias);
-            if (!table_alias.empty()) {
-                exprTableContext[table_alias] = table_node_id;
-            }
-
-            // JOIN
-            for (auto joinCtx : ctx->joins) {
-                visit(joinCtx->relation());
-                node_t table_node_id = visitNode(joinCtx->relation());
+            // FROM
+            std::vector<node_t> table_node_ids;
+            if (ctx->baseTable) {
+                node_t table_node_id = visitNode(ctx->baseTable);
                 table_node_ids.push_back(table_node_id);
                 std::string table_alias = (
-                    joinCtx->relation()->alias
-                    ? joinCtx->relation()->alias->getText()
+                    ctx->baseTable->alias
+                    ? ctx->baseTable->alias->getText()
                     : getNodeName(out_graph, table_node_id)
                 );
                 loadTableNames(exprVarContext, out_graph, table_node_id, table_alias);
                 if (!table_alias.empty()) {
                     exprTableContext[table_alias] = table_node_id;
                 }
-                // TODO: handle join type
 
-                // ON
-                if (joinCtx->onExpr) {
-                    filters.push_back(
-                        visitNode(joinCtx->onExpr)
+                // JOIN
+                for (auto joinCtx : ctx->joins) {
+                    visit(joinCtx->relation());
+                    node_t table_node_id = visitNode(joinCtx->relation());
+                    table_node_ids.push_back(table_node_id);
+                    std::string table_alias = (
+                        joinCtx->relation()->alias
+                        ? joinCtx->relation()->alias->getText()
+                        : getNodeName(out_graph, table_node_id)
                     );
-                }
-            }
-        }
+                    loadTableNames(exprVarContext, out_graph, table_node_id, table_alias);
+                    if (!table_alias.empty()) {
+                        exprTableContext[table_alias] = table_node_id;
+                    }
+                    // TODO: handle join type
 
-        // SELECT items
-        std::vector<node_t> column_node_ids;
-        for (auto selectElement : ctx->selectElement()) {
-            if (selectElement->globalStar) {
-                for (const auto &col : exprVarContext) {
-                    if (col.first.find('.') == std::string::npos) {
-                        column_node_ids.push_back(col.second);
+                    // ON
+                    if (joinCtx->onExpr) {
+                        filters.push_back(
+                            visitNode(joinCtx->onExpr)
+                        );
                     }
                 }
-            } else if (selectElement->tableStar) {
-                // TODO: put table columns here
-            } else {
-                node_t element_node_id = visitNode(selectElement->expression());
-                if (selectElement->alias) {
-                    setNodeName(out_graph, element_node_id, selectElement->alias->getText());
+            }
+
+            // SELECT items
+            std::vector<node_t> column_node_ids;
+            for (auto selectElement : ctx->selectElement()) {
+                if (selectElement->globalStar) {
+                    for (const auto &col : exprVarContext) {
+                        if (col.first.find('.') == std::string::npos) {
+                            column_node_ids.push_back(col.second);
+                        }
+                    }
+                } else if (selectElement->tableStar) {
+                    // TODO: put table columns here
+                } else {
+                    node_t element_node_id = visitNode(selectElement->expression());
+                    if (selectElement->alias) {
+                        setNodeName(out_graph, element_node_id, selectElement->alias->getText());
+                    }
+                    column_node_ids.push_back(element_node_id);
                 }
-                column_node_ids.push_back(element_node_id);
             }
-        }
 
-        // WHERE
-        if (ctx->whereExpr) {
-            filters.push_back(
-                visitNode(ctx->whereExpr)
-            );
-        }
-
-        // GROUP BY
-        std::vector<node_t> group_node_ids;
-        for (auto groupExpr : ctx->groupByExprs) {
-            group_node_ids.push_back(visitNode(groupExpr));
-        }
-
-        // Construct graph nodes
-
-        node_t df_node_id = appendNode(
-            out_graph, NODE_NONE, query::ColumnOperation::DF, data::ValueType::Any, column_node_ids
-        );
-
-        df_node_id = appendNode(
-            out_graph, NODE_NONE, query::ColumnOperation::JOIN, data::ValueType::Any, {df_node_id, table_node_ids}
-        );
-
-        if (!filters.empty()) {
-            node_t filter_node_id = NODE_NONE;
-            if (filters.size() >= 2) {
-                filter_node_id = appendNode(
-                    out_graph, NODE_NONE, query::ColumnOperation::AND, data::ValueType::Any, filters
+            // WHERE
+            if (ctx->whereExpr) {
+                filters.push_back(
+                    visitNode(ctx->whereExpr)
                 );
-            } else if (filters.size() == 1) {
-                filter_node_id = filters[0];
             }
-            df_node_id = appendNode(
-                out_graph, NODE_NONE, query::ColumnOperation::FILTER, data::ValueType::Any, {df_node_id, filter_node_id}
+
+            // GROUP BY
+            std::vector<node_t> group_node_ids;
+            for (auto groupExpr : ctx->groupByExprs) {
+                group_node_ids.push_back(visitNode(groupExpr));
+            }
+
+            // ORDER BY
+            std::vector<node_t> order_node_ids;
+            for (auto sortItem : ctx->sortItems) {
+                node_t item_node_id = visitNode(sortItem->expression());
+                if (sortItem->DESC()) {
+                    item_node_id = appendNode(
+                        out_graph, NODE_NONE, query::ColumnOperation::DESC, data::ValueType::Any, {item_node_id}
+                    );
+                }
+                order_node_ids.push_back(item_node_id);
+            }
+
+            // OFFSET
+            node_t offset_node_id = NODE_NONE;
+            if (ctx->offsetExpr) {
+                offset_node_id = visitNode(ctx->offsetExpr);
+            }
+
+            // LIMIT
+            node_t limit_node_id = NODE_NONE;
+            if (ctx->limitExpr) {
+                limit_node_id = visitNode(ctx->limitExpr);
+            }
+
+            // Construct graph nodes
+
+            node_t df_node_id = appendNode(
+                out_graph, NODE_NONE, query::ColumnOperation::DF, data::ValueType::Any, column_node_ids
             );
+
+            // Tables will auto resolve from columns
+            // df_node_id = appendNode(
+            //     out_graph, NODE_NONE, query::ColumnOperation::JOIN, data::ValueType::Any, {df_node_id, table_node_ids}
+            // );
+
+            if (!filters.empty()) {
+                node_t filter_node_id = NODE_NONE;
+                if (filters.size() >= 2) {
+                    filter_node_id = appendNode(
+                        out_graph, NODE_NONE, query::ColumnOperation::AND, data::ValueType::Any, filters
+                    );
+                } else if (filters.size() == 1) {
+                    filter_node_id = filters[0];
+                }
+                df_node_id = appendNode(
+                    out_graph, NODE_NONE, query::ColumnOperation::FILTER,
+                    data::ValueType::Any, {df_node_id, filter_node_id}
+                );
+            }
+
+            if (!group_node_ids.empty()) {
+                group_node_ids.insert(group_node_ids.begin(), df_node_id);
+                df_node_id = appendNode(
+                    out_graph, NODE_NONE, query::ColumnOperation::GROUP, data::ValueType::Any, group_node_ids
+                );
+            }
+
+            if (!order_node_ids.empty()) {
+                order_node_ids.insert(order_node_ids.begin(), df_node_id);
+                df_node_id = appendNode(
+                    out_graph, NODE_NONE, query::ColumnOperation::SORT, data::ValueType::Any, order_node_ids
+                );
+            }
+
+            if (limit_node_id != NODE_NONE || offset_node_id != NODE_NONE) {
+                if (offset_node_id == NODE_NONE) {
+                    offset_node_id = appendInt64Constant(out_graph, 0);
+                }
+                if (limit_node_id != NODE_NONE) {
+                    limit_node_id = appendNode(
+                        out_graph, NODE_NONE, query::ColumnOperation::ADD,
+                        data::ValueType::Int64, {offset_node_id, limit_node_id}
+                    );
+                }
+                df_node_id = appendNode(
+                    out_graph, NODE_NONE, query::ColumnOperation::RANGE,
+                    data::ValueType::Any, {df_node_id, offset_node_id, limit_node_id}
+                );
+            }
+
+            exprVarContext = std::move(exprTableContextOld);
+            exprVarContext = std::move(exprVarContextOld);
+            return df_node_id;
+        } catch (const std::exception &e) {
+            exprVarContext = std::move(exprTableContextOld);
+            exprVarContext = std::move(exprVarContextOld);
+            throw e;
+        }
+    }
+
+    std::any visitQueryExpression(sqlParser::QueryExpressionContext *ctx) override {
+        std::vector<node_t> select_node_ids;
+        for (auto selectStatement : ctx->selectStatement()) {
+            select_node_ids.push_back(visitNode(selectStatement));
         }
 
-        if (!group_node_ids.empty()) {
-            df_node_id = appendNode(
-                out_graph, NODE_NONE, query::ColumnOperation::GROUP, data::ValueType::Any, {df_node_id, group_node_ids}
+        if (select_node_ids.size() == 1) {
+            return select_node_ids[0];
+        } else {
+            return appendNode(
+                out_graph, NODE_NONE, query::ColumnOperation::UNION,
+                data::ValueType::Any, select_node_ids
             );
         }
+    }
 
-        // TODO: offset, limit
+    std::any visitUpdateStatement(sqlParser::UpdateStatementContext *ctx) override {
+        throw std::runtime_error("Update unimplemented");
+    }
 
-        return df_node_id;
+    std::any visitDeleteStatement(sqlParser::DeleteStatementContext *ctx) override {
+        throw std::runtime_error("Delete unimplemented");
+    }
+
+    std::any visitQuery(sqlParser::QueryContext *ctx) override {
+        std::map<std::string, node_t> withTableContextOld;
+        withTableContextOld.swap(withTableContext);
+
+        try {
+            for (auto cte : ctx->cte()) {
+                withTableContext[cte->identifier()->getText()] = visitNode(cte);
+            }
+
+            node_t query_node_id = visitNode(ctx->statement());
+
+            withTableContext = std::move(withTableContextOld);
+            return query_node_id;
+        } catch (const std::exception &e) {
+            withTableContext = std::move(withTableContextOld);
+            throw e;
+        }
     }
 };
 
@@ -538,5 +631,10 @@ void parseAndPrintSQL(const std::string& sqlString) {
     SqlVisitor visitor;
     visitor.visit(tree);
 
-    std::cout << "--------------------------------------\n\n";
+    printQueryGraph(visitor.getGraph());
+}
+
+int main() {
+    parseAndPrintSQL("SELECT 1");
+    return 0;
 }

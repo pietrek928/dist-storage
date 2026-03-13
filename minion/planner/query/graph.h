@@ -340,10 +340,9 @@ bool isTableOperation(
     switch (op) {
         case query::ColumnOperation::TABLE:
         case query::ColumnOperation::DF:
-        case query::ColumnOperation::JOIN:
         case query::ColumnOperation::FILTER:
         case query::ColumnOperation::RANGE:
-        case query::ColumnOperation::ORDER:
+        case query::ColumnOperation::SORT:
         case query::ColumnOperation::UNION:
             return true;
         default:
@@ -440,6 +439,36 @@ std::vector<Operation> mapOperations(
     return newOperations;
 }
 
+void fillDFIdsWalk(
+    std::vector<Operation> &operations,
+    const std::vector<std::vector<node_t>> &graph_mapping,
+    node_t df_node_id
+) {
+    auto &node = operations[df_node_id];
+    if (node.df != NODE_NONE) {
+        return;
+    }
+    node.df = df_node_id;
+    for (auto child_id : graph_mapping[df_node_id]) {
+        const auto &child_node = operations[child_id];
+        if (!isTableOperation(child_node.op)) {
+            fillDFIdsWalk(operations, graph_mapping, child_id);
+        }
+    }
+}
+
+// Assume nodes are in parsing order
+void fillDFIds(
+    std::vector<Operation> &operations,
+    const std::vector<std::vector<node_t>> &graph_mapping
+) {
+    for (node_t i = 0; i < operations.size(); i++) {
+        if (isTableOperation(operations[i].op)) {
+            fillDFIdsWalk(operations, graph_mapping, i);
+        }
+    }
+}
+
 node_hash_t hashChildrenPositional(
     const node_t *children, int nchildren,
     const std::vector<node_hash_t> &nodeHashes
@@ -495,4 +524,120 @@ void fillNodeHashes(
         }
         nodeHashes[node] = hashOperationParams(operations[node]) + child_hash;
     }
+}
+
+// Safely prints the constant value based on its type and sequence
+void printConstant(const QueryGraph& graph, const Operation& op) {
+    if (op.const_id == NODE_NONE) return;
+
+    std::cout << " | Const: ";
+
+    // Check if it's an array or a scalar
+    bool is_array = (op.sequence == data::SequenceType::ARRAY); // Adjust enum value if needed
+
+    if (!is_array) {
+        // --- SCALARS ---
+        if (op.type == data::ValueType::Int64 && op.const_id < graph.int64_constants.size()) {
+            std::cout << graph.int64_constants[op.const_id];
+        } else if (op.type == data::ValueType::Float64 && op.const_id < graph.float64_constants.size()) {
+            std::cout << graph.float64_constants[op.const_id];
+        } else if (op.type == data::ValueType::String && op.const_id < graph.string_constants.size()) {
+            std::cout << "\"" << graph.string_constants[op.const_id] << "\"";
+        } else {
+            std::cout << "[ID: " << op.const_id << "]";
+        }
+    } else {
+        // --- ARRAYS ---
+        std::cout << "{ ";
+        if (op.type == data::ValueType::Int64 && op.const_id < graph.int64_array_constants.size()) {
+            const auto& vec = graph.int64_array_constants[op.const_id];
+            for (size_t i = 0; i < vec.size(); ++i) std::cout << vec[i] << (i + 1 < vec.size() ? ", " : "");
+        } else if (op.type == data::ValueType::Float64 && op.const_id < graph.float64_array_constants.size()) {
+            const auto& vec = graph.float64_array_constants[op.const_id];
+            for (size_t i = 0; i < vec.size(); ++i) std::cout << vec[i] << (i + 1 < vec.size() ? ", " : "");
+        } else if (op.type == data::ValueType::String && op.const_id < graph.string_array_constants.size()) {
+            const auto& vec = graph.string_array_constants[op.const_id];
+            for (size_t i = 0; i < vec.size(); ++i) std::cout << "\"" << vec[i] << "\"" << (i + 1 < vec.size() ? ", " : "");
+        }
+        std::cout << " }";
+    }
+}
+
+void printQueryGraph(const QueryGraph& graph) {
+    std::cout << "\n=================================================================\n";
+    std::cout << "                   QUERY GRAPH EXECUTION PLAN                    \n";
+    std::cout << "=================================================================\n";
+
+    // 1. Bucket the operations by their DataFrame ID
+    std::map<node_t, std::vector<node_t>> df_groups;
+    std::vector<node_t> standalone_nodes;
+
+    for (node_t i = 0; i < graph.operations.size(); ++i) {
+        node_t current_df = graph.operations[i].df;
+
+        if (current_df == i) {
+            // It is its own DataFrame (a Root Node)
+            df_groups[i] = {};
+        } else if (current_df != NODE_NONE) {
+            // It is an operation belonging to a DataFrame
+            df_groups[current_df].push_back(i);
+        } else {
+            // It has no DF attached
+            standalone_nodes.push_back(i);
+        }
+    }
+
+    // 2. Helper lambda to print a single formatted row
+    auto printNode = [&](node_t id, bool is_child) {
+        const Operation& op = graph.operations[id];
+
+        // Indent children to show they run "inside" the DataFrame
+        std::string prefix = is_child ? "    ├─ " : "▶ ";
+
+        std::cout << prefix << "[" << std::setw(3) << id << "] "
+                  << std::left << std::setw(22) << query::ColumnOperation_Name(op.op);
+
+        std::cout << " | " << std::setw(8) << data::ValueType_Name(op.type);
+
+        // Print Name (Fallback to DF name for reference if it has none)
+        if (op.name != NODE_NONE && op.name < graph.names.size()) {
+            std::cout << " | Name: '" << graph.names[op.name] << "'";
+        } else if (is_child && op.df != NODE_NONE) {
+            node_t parent_name_id = graph.operations[op.df].name;
+            if (parent_name_id != NODE_NONE && parent_name_id < graph.names.size()) {
+                std::cout << " | (DF: " << graph.names[parent_name_id] << ")";
+            }
+        }
+
+        // Print Constants
+        printConstant(graph, op);
+
+        // Print Arguments (Edges to other nodes)
+        if (id < graph.graph_mapping.size() && !graph.graph_mapping[id].empty()) {
+            std::cout << " | Args: { ";
+            for (size_t j = 0; j < graph.graph_mapping[id].size(); ++j) {
+                std::cout << graph.graph_mapping[id][j] << (j + 1 < graph.graph_mapping[id].size() ? ", " : "");
+            }
+            std::cout << " }";
+        }
+        std::cout << "\n";
+    };
+
+    // 3. Print everything grouped perfectly
+    for (const auto& [df_id, children] : df_groups) {
+        std::cout << "-----------------------------------------------------------------\n";
+        printNode(df_id, false); // Print the DF Root
+
+        for (node_t child_id : children) {
+            printNode(child_id, true); // Print all operations inside this DF
+        }
+    }
+
+    if (!standalone_nodes.empty()) {
+        std::cout << "-----------------------------------------------------------------\n";
+        std::cout << "▶ STANDALONE / UNATTACHED NODES\n";
+        for (node_t id : standalone_nodes) printNode(id, false);
+    }
+
+    std::cout << "=================================================================\n\n";
 }
