@@ -41,6 +41,102 @@ typedef struct QueryGraph {
     std::vector<std::vector<node_t>> graph_mapping;
 } QueryGraph;
 
+query::ColumnOperation getNegatedOperation(
+    query::ColumnOperation op
+) {
+    switch (op) {
+        case query::ColumnOperation::NOT:
+            return query::ColumnOperation::NOP;
+        case query::ColumnOperation::NULL_:
+            return query::ColumnOperation::NULL_;
+        case query::ColumnOperation::AND:
+            return query::ColumnOperation::NAND;
+        case query::ColumnOperation::OR:
+            return query::ColumnOperation::NOR;
+        case query::ColumnOperation::XOR:
+            return query::ColumnOperation::XNOR;
+        case query::ColumnOperation::NAND:
+            return query::ColumnOperation::AND;
+        case query::ColumnOperation::NOR:
+            return query::ColumnOperation::OR;
+        case query::ColumnOperation::XNOR:
+            return query::ColumnOperation::XOR;
+        case query::ColumnOperation::GT:
+            return query::ColumnOperation::LTE;
+        case query::ColumnOperation::LT:
+            return query::ColumnOperation::GTE;
+        case query::ColumnOperation::GTE:
+            return query::ColumnOperation::LT;
+        case query::ColumnOperation::LTE:
+            return query::ColumnOperation::GT;
+        case query::ColumnOperation::EQ:
+            return query::ColumnOperation::NEQ;
+        case query::ColumnOperation::NEQ:
+            return query::ColumnOperation::EQ;
+        case query::ColumnOperation::IN:
+            return query::ColumnOperation::NOT_IN;
+        case query::ColumnOperation::NOT_IN:
+            return query::ColumnOperation::IN;
+        case query::ColumnOperation::LIKE:
+            return query::ColumnOperation::NOT_LIKE;
+        case query::ColumnOperation::NOT_LIKE:
+            return query::ColumnOperation::LIKE;
+        case query::ColumnOperation::ILIKE:
+            return query::ColumnOperation::NOT_ILIKE;
+        case query::ColumnOperation::NOT_ILIKE:
+            return query::ColumnOperation::ILIKE;
+        case query::ColumnOperation::IS_NULL:
+            return query::ColumnOperation::IS_NOT_NULL;
+        case query::ColumnOperation::IS_NOT_NULL:
+            return query::ColumnOperation::IS_NULL;
+
+        default:
+            return query::ColumnOperation::INVALID;
+    }
+}
+
+bool isCummutative(
+    query::ColumnOperation op
+) {
+    switch (op) {
+        case query::ColumnOperation::AND:
+        case query::ColumnOperation::NAND:
+        case query::ColumnOperation::OR:
+        case query::ColumnOperation::NOR:
+        case query::ColumnOperation::XOR:
+        case query::ColumnOperation::XNOR:
+        case query::ColumnOperation::ADD:
+        case query::ColumnOperation::MUL:
+        case query::ColumnOperation::MIN:
+        case query::ColumnOperation::MAX:
+        case query::ColumnOperation::AVG:
+        case query::ColumnOperation::COUNT:
+        case query::ColumnOperation::COUNT_DISTINCT:
+        case query::ColumnOperation::SUM:
+        case query::ColumnOperation::MEDIAN:
+        case query::ColumnOperation::VAR:
+        case query::ColumnOperation::STD:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool isTableOperation(
+    query::ColumnOperation op
+) {
+    switch (op) {
+        case query::ColumnOperation::TABLE:
+        case query::ColumnOperation::DF:
+        case query::ColumnOperation::FILTER:
+        case query::ColumnOperation::RANGE:
+        case query::ColumnOperation::SORT:
+        case query::ColumnOperation::UNION:
+            return true;
+        default:
+            return false;
+    }
+}
 
 node_t appendName(QueryGraph &graph, const std::string &name) {
     node_t name_id = graph.names.size();
@@ -253,103 +349,6 @@ std::vector<std::pair<node_t, node_t>> getEdgesList(
     return edges;
 }
 
-query::ColumnOperation getNegatedOperation(
-    query::ColumnOperation op
-) {
-    switch (op) {
-        case query::ColumnOperation::NOT:
-            return query::ColumnOperation::NOP;
-        case query::ColumnOperation::NULL_:
-            return query::ColumnOperation::NULL_;
-        case query::ColumnOperation::AND:
-            return query::ColumnOperation::NAND;
-        case query::ColumnOperation::OR:
-            return query::ColumnOperation::NOR;
-        case query::ColumnOperation::XOR:
-            return query::ColumnOperation::XNOR;
-        case query::ColumnOperation::NAND:
-            return query::ColumnOperation::AND;
-        case query::ColumnOperation::NOR:
-            return query::ColumnOperation::OR;
-        case query::ColumnOperation::XNOR:
-            return query::ColumnOperation::XOR;
-        case query::ColumnOperation::GT:
-            return query::ColumnOperation::LTE;
-        case query::ColumnOperation::LT:
-            return query::ColumnOperation::GTE;
-        case query::ColumnOperation::GTE:
-            return query::ColumnOperation::LT;
-        case query::ColumnOperation::LTE:
-            return query::ColumnOperation::GT;
-        case query::ColumnOperation::EQ:
-            return query::ColumnOperation::NEQ;
-        case query::ColumnOperation::NEQ:
-            return query::ColumnOperation::EQ;
-        case query::ColumnOperation::IN:
-            return query::ColumnOperation::NOT_IN;
-        case query::ColumnOperation::NOT_IN:
-            return query::ColumnOperation::IN;
-        case query::ColumnOperation::LIKE:
-            return query::ColumnOperation::NOT_LIKE;
-        case query::ColumnOperation::NOT_LIKE:
-            return query::ColumnOperation::LIKE;
-        case query::ColumnOperation::ILIKE:
-            return query::ColumnOperation::NOT_ILIKE;
-        case query::ColumnOperation::NOT_ILIKE:
-            return query::ColumnOperation::ILIKE;
-        case query::ColumnOperation::IS_NULL:
-            return query::ColumnOperation::IS_NOT_NULL;
-        case query::ColumnOperation::IS_NOT_NULL:
-            return query::ColumnOperation::IS_NULL;
-
-        default:
-            return query::ColumnOperation::INVALID;
-    }
-}
-
-bool isCummutative(
-    query::ColumnOperation op
-) {
-    switch (op) {
-        case query::ColumnOperation::AND:
-        case query::ColumnOperation::NAND:
-        case query::ColumnOperation::OR:
-        case query::ColumnOperation::NOR:
-        case query::ColumnOperation::XOR:
-        case query::ColumnOperation::XNOR:
-        case query::ColumnOperation::ADD:
-        case query::ColumnOperation::MUL:
-        case query::ColumnOperation::MIN:
-        case query::ColumnOperation::MAX:
-        case query::ColumnOperation::AVG:
-        case query::ColumnOperation::COUNT:
-        case query::ColumnOperation::COUNT_DISTINCT:
-        case query::ColumnOperation::SUM:
-        case query::ColumnOperation::MEDIAN:
-        case query::ColumnOperation::VAR:
-        case query::ColumnOperation::STD:
-            return true;
-        default:
-            return false;
-    }
-}
-
-bool isTableOperation(
-    query::ColumnOperation op
-) {
-    switch (op) {
-        case query::ColumnOperation::TABLE:
-        case query::ColumnOperation::DF:
-        case query::ColumnOperation::FILTER:
-        case query::ColumnOperation::RANGE:
-        case query::ColumnOperation::SORT:
-        case query::ColumnOperation::UNION:
-            return true;
-        default:
-            return false;
-    }
-}
-
 void fillVisited(
     const std::vector<std::vector<node_t>> &graph_mapping,
     std::vector<node_t> &visited,
@@ -452,7 +451,7 @@ void fillDFIdsWalk(
     for (auto child_id : graph_mapping[df_node_id]) {
         const auto &child_node = operations[child_id];
         if (!isTableOperation(child_node.op)) {
-            fillDFIdsWalk(operations, graph_mapping, child_id);
+            fillDFIdsWalk(operations, graph_mapping, df_node_id);
         }
     }
 }

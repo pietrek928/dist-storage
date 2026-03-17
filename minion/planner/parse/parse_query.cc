@@ -7,6 +7,7 @@
 #include <iostream>
 
 #include "../query/graph.h"
+#include "ParserRuleContext.h"
 #include "data.pb.h"
 #include "query.pb.h"
 
@@ -101,6 +102,16 @@ std::string unescapeSqlString(const std::string& rawInput) {
     return result;
 }
 
+std::string normalizeOp(std::string op) {
+    op.erase(std::remove(op.begin(), op.end(), ' '), op.end());
+
+    std::transform(op.begin(), op.end(), op.begin(),
+        [](unsigned char c) { return std::toupper(c); }
+    );
+
+    return op;
+}
+
 node_t findIdent(
     const std::string &ident,
     const std::initializer_list<const std::map<std::string, node_t>> &identMapStack
@@ -114,17 +125,92 @@ node_t findIdent(
     return NODE_NONE;
 }
 
-// void pushContext(
-//     std::vector<std::map<std::string, node_t>> &identMapStack
-// ) {
-//     identMapStack.emplace_back();
-// }
+class SqlCompileError : public std::runtime_error {
+public:
+    size_t line = 0;
+    size_t column = 0;
+    size_t length = 0;
 
-// void popContext(
-//     std::vector<std::map<std::string, node_t>> &identMapStack
-// ) {
-//     identMapStack.pop_back();
-// }
+    // 1. The Original Manual Constructor
+    SqlCompileError(const std::string& message, size_t line, size_t column, size_t length = 1)
+        : std::runtime_error(message), line(line), column(column), length(length) {}
+
+    // 2. Convenience Constructor for Parser Rules (e.g., ctx, ctx->columnName)
+    SqlCompileError(const std::string& message, antlr4::ParserRuleContext* ctx)
+        : std::runtime_error(message) {
+        if (ctx && ctx->getStart() && ctx->getStop()) {
+            line = ctx->getStart()->getLine();
+            column = ctx->getStart()->getCharPositionInLine();
+            // Safely calculate the exact length of the entire rule text
+            length = ctx->getStop()->getStopIndex() - ctx->getStart()->getStartIndex() + 1;
+        }
+    }
+
+    // 3. Convenience Constructor for Lexer Tokens (e.g., ctx->globalStar)
+    SqlCompileError(const std::string& message, antlr4::Token* token)
+        : std::runtime_error(message) {
+        if (token) {
+            line = token->getLine();
+            column = token->getCharPositionInLine();
+            length = token->getStopIndex() - token->getStartIndex() + 1;
+        }
+    }
+};
+
+class ThrowingErrorListener : public antlr4::BaseErrorListener {
+public:
+    void syntaxError(
+        antlr4::Recognizer *recognizer, antlr4::Token *offendingSymbol,
+        size_t line, size_t charPositionInLine,
+        const std::string &msg, std::exception_ptr e
+    ) override {
+        throw SqlCompileError("Compile error: " + msg, offendingSymbol);
+    }
+};
+
+// Helper to extract a specific line from a multi-line string (1-indexed)
+std::string getLineFromString(const std::string& text, size_t line_number) {
+    std::istringstream stream(text);
+    std::string line;
+    for (size_t i = 0; i < line_number; ++i) {
+        if (!std::getline(stream, line)) {
+            return "<Line out of bounds>";
+        }
+    }
+    return line;
+}
+
+// The main error printing function
+void printSqlError(const std::string& raw_sql, const SqlCompileError& e) {
+    std::cerr << "\n=========================================\n";
+    std::cerr << "             SQL PARSE ERROR               \n";
+    std::cerr << "=========================================\n";
+
+    // 1. Print the actual error message
+    std::cerr << "ERROR: " << e.what() << "\n\n";
+
+    // 2. Extract the exact line where the error occurred
+    std::string offending_line = getLineFromString(raw_sql, e.line);
+
+    // 3. Setup the prefix so we can align our arrows perfectly
+    std::string prefix = "LINE " + std::to_string(e.line) + ": ";
+
+    // 4. Print the line of SQL code
+    std::cerr << prefix << offending_line << "\n";
+
+    // 5. Print the padding to align the underline
+    // We pad with spaces equal to the prefix length + the column offset
+    for (size_t i = 0; i < prefix.length() + e.column; ++i) {
+        std::cerr << " ";
+    }
+
+    // 6. Print the exact underline highlighting the bad token
+    for (size_t i = 0; i < e.length; ++i) {
+        std::cerr << "^";
+    }
+
+    std::cerr << "\n=========================================\n\n";
+}
 
 class SqlVisitor : public sqlBaseVisitor {
     QueryGraph out_graph;
@@ -140,16 +226,16 @@ class SqlVisitor : public sqlBaseVisitor {
         {"*", query::ColumnOperation::MUL},
         {"/", query::ColumnOperation::DIV},
         {"|", query::ColumnOperation::OR},
+        {"||", query::ColumnOperation::OR},
         {"OR", query::ColumnOperation::OR},
         {"&", query::ColumnOperation::AND},
+        {"&&", query::ColumnOperation::AND},
         {"AND", query::ColumnOperation::AND},
         {"^", query::ColumnOperation::XOR},
         {"XOR", query::ColumnOperation::XOR},
         {"~", query::ColumnOperation::NOT},
         {"!", query::ColumnOperation::NOT},
         {"NOT", query::ColumnOperation::NOT},
-        {"||", query::ColumnOperation::OR},
-        {"&&", query::ColumnOperation::AND},
         {"!=", query::ColumnOperation::NEQ},
         {"<>", query::ColumnOperation::NEQ},
         {"<=", query::ColumnOperation::LTE},
@@ -159,13 +245,13 @@ class SqlVisitor : public sqlBaseVisitor {
         {"=", query::ColumnOperation::EQ},
         {"==", query::ColumnOperation::EQ},
         {"IN", query::ColumnOperation::IN},
-        {"NOT IN", query::ColumnOperation::NOT_IN},
+        {"NOTIN", query::ColumnOperation::NOT_IN},
         {"LIKE", query::ColumnOperation::LIKE},
-        {"NOT LIKE", query::ColumnOperation::NOT_LIKE},
+        {"NOTLIKE", query::ColumnOperation::NOT_LIKE},
         {"ILIKE", query::ColumnOperation::ILIKE},
-        {"NOT ILIKE", query::ColumnOperation::NOT_ILIKE},
-        {"IS NULL", query::ColumnOperation::IS_NULL},
-        {"IS NOT NULL", query::ColumnOperation::IS_NOT_NULL},
+        {"NOTILIKE", query::ColumnOperation::NOT_ILIKE},
+        {"ISNULL", query::ColumnOperation::IS_NULL},
+        {"ISNOTNULL", query::ColumnOperation::IS_NOT_NULL},
         {"NULL", query::ColumnOperation::NULL_},
         {"TRUE", query::ColumnOperation::TRUE},
         {"FALSE", query::ColumnOperation::FALSE},
@@ -181,12 +267,16 @@ class SqlVisitor : public sqlBaseVisitor {
         return table_node_id;
     }
 
-    node_t findOrInsertTable(const std::string &name) {
-        node_t table_node_id = findIdent(name, {fileTableContext, withTableContext});
+    node_t findOrInsertTable(ParserRuleContext *nameCtx) {
+        std::string name = nameCtx->getText();
+
+        node_t table_node_id = findIdent(
+            name, {fileTableContext, withTableContext}
+        );
         if (table_node_id != NODE_NONE) {
             auto op = out_graph.operations[table_node_id].op;
             if (!isTableOperation(op)) {
-                throw std::runtime_error("Invalid table name: " + name);
+                throw SqlCompileError("Invalid table name: " + name, nameCtx);
             }
             return table_node_id;
         }
@@ -199,17 +289,33 @@ class SqlVisitor : public sqlBaseVisitor {
             }
         }
 
-        throw std::runtime_error("Unknown table name: " + name);
+        throw SqlCompileError("Unknown table name: " + name, nameCtx);
     }
 
     node_t appendOperation(
-        sqlParser::ExpressionContext *ctx,
-        const std::string& opName,
-        std::initializer_list<node_t> nodeArgs
+        ParserRuleContext *ctx,
+        Token *opToken,
+        const std::vector<node_t> &nodeArgs
     ) {
-        const auto &op_iter = opMap.find(opName);
+        const auto &op_iter = opMap.find(normalizeOp(opToken->getText()));
         if (op_iter == opMap.end()) {
-            throw std::runtime_error("Unknown operator: " + opName);
+            throw SqlCompileError("Unknown operator: " + opToken->getText(), opToken);
+        }
+        query::ColumnOperation op_value = op_iter->second;
+
+        return appendNode(
+            out_graph, NODE_NONE, op_value, data::ValueType::Any, nodeArgs
+        );
+    }
+
+    node_t appendOperation(
+        ParserRuleContext *ctx,
+        ParserRuleContext *opCtx,
+        const std::vector<node_t> &nodeArgs
+    ) {
+        const auto &op_iter = opMap.find(normalizeOp(opCtx->getText()));
+        if (op_iter == opMap.end()) {
+            throw SqlCompileError("Unknown operator: " + opCtx->getText(), opCtx);
         }
         query::ColumnOperation op_value = op_iter->second;
 
@@ -228,7 +334,7 @@ public:
         return out_graph;
     }
 
-    std::any visitLiteral(sqlParser::LiteralContext *ctx) override {
+    std::any visitLiteralExpr(sqlParser::LiteralExprContext *ctx) override {
         visitChildren(ctx);
 
         if (ctx->STRING_LITERAL()) {
@@ -240,10 +346,10 @@ public:
                 out_graph, str
             );
         } else if (ctx->INT_LITERAL()) {
-            int64_t num = std::stoll(ctx->INT_LITERAL()->getText());
+            int64_t num = std::stoll(ctx->getText());
             return appendInt64Constant(out_graph, num);
         } else if (ctx->FLOAT_LITERAL()) {
-            double num = std::stod(ctx->FLOAT_LITERAL()->getText());
+            double num = std::stod(ctx->getText());
             return appendFloat64Constant(out_graph, num);
         } else if (ctx->NULL_KW()) {
             return appendNode(out_graph, 0, query::ColumnOperation::NULL_, data::ValueType::Any);
@@ -256,51 +362,58 @@ public:
         }
     }
 
+    std::any visitParenthesizedExpr(sqlParser::ParenthesizedExprContext *ctx) override {
+        return visitNode(ctx->inside);
+    }
+
     std::any visitColumnExpr(sqlParser::ColumnExprContext *ctx) override {
         visitChildren(ctx);
 
-        std::string var_name = ctx->columnName->IDENTIFIER()->getText();
+        std::string var_name = ctx->columnName->getText();
         if (ctx->tableName) {
             var_name = ctx->tableName->getText() + "." + var_name;
         }
 
         node_t node_id = findIdent(var_name, {exprVarContext});
         if (node_id == NODE_NONE) {
-            throw std::runtime_error("Unknown identifier: " + var_name);
+            throw SqlCompileError("Unknown identifier: " + var_name, ctx->columnName);
         }
         return node_id;
     }
 
     std::any visitMulDivExpr(sqlParser::MulDivExprContext *ctx) override {
         return appendOperation(
-            ctx, ctx->op->getText(),
+            ctx, ctx->op,
             {visitNode(ctx->left), visitNode(ctx->right)}
         );
     }
 
     std::any visitAddSubExpr(sqlParser::AddSubExprContext *ctx) override {
         return appendOperation(
-            ctx, ctx->op->getText(),
+            ctx, ctx->op,
             {visitNode(ctx->left), visitNode(ctx->right)}
         );
     }
 
-    std::any visitNotExpr(sqlParser::NotExprContext *ctx) override {
+    std::any visitIsNullExpr(sqlParser::IsNullExprContext *ctx) override {
         return appendOperation(
-            ctx, ctx->op->getText(),
-            {visitNode(ctx->expression())}
+            ctx, ctx->op, {}
         );
     }
 
-    std::any visitLikeExpr(sqlParser::LikeExprContext *ctx) override {
-        std::string opString = ctx->LIKE() ? "LIKE" : "ILIKE";
-        if (ctx->notOp) {
-            opString = "NOT " + opString;
+    std::any visitNotExpr(sqlParser::NotExprContext *ctx) override {
+        if (ctx->exprNot) {
+            return appendOperation(
+                ctx, ctx->op,
+                {visitNode(ctx->exprNot)}
+            );
         }
+        return visitNode(ctx->exprPass);
+    }
 
+    std::any visitLikeExpr(sqlParser::LikeExprContext *ctx) override {
         return appendOperation(
-            ctx,
-            opString,
+            ctx, ctx->op,
             {visitNode(ctx->left), visitNode(ctx->right)}
         );
     }
@@ -340,44 +453,73 @@ public:
             left_node_id = right_node_id;
         }
 
-        return appendNode(
-            out_graph, NODE_NONE, query::ColumnOperation::AND,
-            data::ValueType::Any, cmp_node_ids
-        );
+        if (cmp_node_ids.size() >= 2) {
+            return appendNode(
+                out_graph, NODE_NONE, query::ColumnOperation::AND,
+                data::ValueType::Any, cmp_node_ids
+            );
+        } else {
+            return cmp_node_ids[0];
+        }
+    }
+
+    std::any visitExpression(sqlParser::ExpressionContext *ctx) override {
+        return visitNode(ctx->orExpr());
     }
 
     std::any visitAndExpr(sqlParser::AndExprContext *ctx) override {
-        return appendOperation(
-            ctx, ctx->op->getText(),
-            {visitNode(ctx->left), visitNode(ctx->right)}
+        std::vector<node_t> and_node_ids = {visitNode(ctx->firstArg)};
+        for (auto arg : ctx->args) {
+            and_node_ids.push_back(visitNode(arg));
+        }
+        if (and_node_ids.size() == 1) {
+            return and_node_ids[0];
+        }
+        return appendNode(
+            out_graph, NODE_NONE, query::ColumnOperation::AND,
+            data::ValueType::Any, and_node_ids
         );
     }
 
     std::any visitXorExpr(sqlParser::XorExprContext *ctx) override {
-        return appendOperation(
-            ctx, ctx->op->getText(),
-            {visitNode(ctx->left), visitNode(ctx->right)}
+        std::vector<node_t> xor_node_ids = {visitNode(ctx->firstArg)};
+        for (auto arg : ctx->args) {
+            xor_node_ids.push_back(visitNode(arg));
+        }
+        if (xor_node_ids.size() == 1) {
+            return xor_node_ids[0];
+        }
+        return appendNode(
+            out_graph, NODE_NONE, query::ColumnOperation::XOR,
+            data::ValueType::Any, xor_node_ids
         );
     }
 
     std::any visitOrExpr(sqlParser::OrExprContext *ctx) override {
-        return appendOperation(
-            ctx, ctx->op->getText(),
-            {visitNode(ctx->left), visitNode(ctx->right)}
+        std::vector<node_t> or_node_ids = {visitNode(ctx->firstArg)};
+        for (auto arg : ctx->args) {
+            or_node_ids.push_back(visitNode(arg));
+        }
+        if (or_node_ids.size() == 1) {
+            return or_node_ids[0];
+        }
+        return appendNode(
+            out_graph, NODE_NONE, query::ColumnOperation::OR,
+            data::ValueType::Any, or_node_ids
         );
     }
 
     virtual std::any visitRelation(sqlParser::RelationContext *ctx) override {
         std::string alias;
-        if (ctx->AS()) {
-            alias = ctx->identifier().back()->getText();
+        if (ctx->alias) {
+            alias = ctx->alias->getText();
         }
 
         node_t table_node_id;
         if (ctx->queryExpression()) {
             table_node_id = visitNode(ctx->queryExpression());
         } else {
-            auto table_name = ctx->identifier(0)->getText();
+            auto table_name = ctx->name;
             table_node_id = findOrInsertTable(table_name);
         }
         std::string expr_name = getNodeName(out_graph, table_node_id);
@@ -496,14 +638,10 @@ public:
 
             // Construct graph nodes
 
+            column_node_ids.insert(column_node_ids.begin(), table_node_ids.begin(), table_node_ids.end());
             node_t df_node_id = appendNode(
                 out_graph, NODE_NONE, query::ColumnOperation::DF, data::ValueType::Any, column_node_ids
             );
-
-            // Tables will auto resolve from columns
-            // df_node_id = appendNode(
-            //     out_graph, NODE_NONE, query::ColumnOperation::JOIN, data::ValueType::Any, {df_node_id, table_node_ids}
-            // );
 
             if (!filters.empty()) {
                 node_t filter_node_id = NODE_NONE;
@@ -556,7 +694,7 @@ public:
         } catch (const std::exception &e) {
             exprVarContext = std::move(exprTableContextOld);
             exprVarContext = std::move(exprVarContextOld);
-            throw e;
+            throw;
         }
     }
 
@@ -577,11 +715,11 @@ public:
     }
 
     std::any visitUpdateStatement(sqlParser::UpdateStatementContext *ctx) override {
-        throw std::runtime_error("Update unimplemented");
+        throw SqlCompileError("Update unimplemented", ctx);
     }
 
     std::any visitDeleteStatement(sqlParser::DeleteStatementContext *ctx) override {
-        throw std::runtime_error("Delete unimplemented");
+        throw SqlCompileError("Delete unimplemented", ctx);
     }
 
     std::any visitQuery(sqlParser::QueryContext *ctx) override {
@@ -590,7 +728,7 @@ public:
 
         try {
             for (auto cte : ctx->cte()) {
-                withTableContext[cte->identifier()->getText()] = visitNode(cte);
+                withTableContext[cte->alias->getText()] = visitNode(cte->expr);
             }
 
             node_t query_node_id = visitNode(ctx->statement());
@@ -599,7 +737,7 @@ public:
             return query_node_id;
         } catch (const std::exception &e) {
             withTableContext = std::move(withTableContextOld);
-            throw e;
+            throw;
         }
     }
 };
@@ -610,31 +748,44 @@ public:
 void parseAndPrintSQL(const std::string& sqlString) {
     std::cout << "--- Parsing Query: " << sqlString << " ---\n";
 
-    // A. Setup the input stream
-    ANTLRInputStream input(sqlString);
+    try {
+        // A. Setup the input stream
+        ANTLRInputStream input(sqlString);
 
-    // B. Lexer reads characters and creates tokens
-    sqlLexer lexer(&input);
-    CommonTokenStream tokens(&lexer);
+        // B. Lexer reads characters and creates tokens
+        sqlLexer lexer(&input);
+        CommonTokenStream tokens(&lexer);
 
-    // C. Parser reads tokens and builds the AST
-    sqlParser parser(&tokens);
+        // C. Parser reads tokens and builds the AST
+        sqlParser parser(&tokens);
 
-    // D. Start parsing at the 'query' rule (the top level of our grammar)
-    tree::ParseTree *tree = parser.query();
+        ThrowingErrorListener errorListener;
+        parser.removeErrorListeners(); // Remove default
+        parser.addErrorListener(&errorListener);
 
-    // (Optional) Print the raw LISP-style syntax tree generated by ANTLR
-    // This is incredibly useful for debugging your grammar!
-    std::cout << "Raw AST: " << tree->toStringTree(&parser) << "\n\n";
+        // D. Start parsing at the 'query' rule (the top level of our grammar)
+        tree::ParseTree *tree = parser.query();
 
-    // E. Traverse the tree using our custom Visitor
-    SqlVisitor visitor;
-    visitor.visit(tree);
+        // (Optional) Print the raw LISP-style syntax tree generated by ANTLR
+        // This is incredibly useful for debugging your grammar!
+        std::cout << "Raw AST: " << tree->toStringTree(&parser) << "\n\n";
 
-    printQueryGraph(visitor.getGraph());
+        // E. Traverse the tree using our custom Visitor
+        SqlVisitor visitor;
+        visitor.visit(tree);
+
+        auto graph = visitor.getGraph();
+        fillDFIds(graph.operations, graph.graph_mapping);
+        printQueryGraph(graph);
+    } catch (const SqlCompileError& e) {
+        // Catch our custom semantic/compilation errors
+        printSqlError(sqlString, e);
+    }
 }
 
-int main() {
-    parseAndPrintSQL("SELECT 1");
+int main(int argc, const char *argv[]) {
+    if (argc >= 2) {
+        parseAndPrintSQL(argv[1]);
+    }
     return 0;
 }

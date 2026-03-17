@@ -6,7 +6,7 @@ grammar sql;
 
 // The entry point. WITH clauses can apply to SELECT, UPDATE, or DELETE
 query: (WITH cte (',' cte)*)? statement EOF ;
-cte: identifier AS '(' queryExpression ')' ;
+cte: alias=identifier AS '(' expr=queryExpression ')' ;
 
 // --- Statement Router ---
 statement
@@ -35,7 +35,7 @@ selectElement
     ;
 sortItem: expression dir=(ASC | DESC)? ;
 
-relation: identifier (AS? alias=identifier)? | '(' queryExpression ')' (AS? alias=identifier)? ;
+relation: name=identifier (AS? alias=identifier)? | '(' queryExpression ')' (AS? alias=identifier)? ;
 joinType: (INNER | LEFT | RIGHT | FULL) ;
 joinClause: joinType? JOIN relation ON onExpr=expression ;
 
@@ -52,29 +52,50 @@ deleteStatement:
     DELETE FROM identifier (WHERE expression)?
     ;
 
-// --- Data Types ---
-dataType: INT | FLOAT | BOOL | VARCHAR | STRING ;
-
 // --- Expressions & Precedence ---
-expression
-    : '(' expression ')'                                        # ParenthesizedExpr
-    | '(' queryExpression ')'                                   # SubqueryExpr
-    | functionCall                                              # FunctionExpr
-    | (tableName=identifier '.')? columnName=identifier         # ColumnExpr
-    | literal                                                   # LiteralExpr
-    | left=expression '::' dataType                             # CastExpr
-    | op=(NOT | '~' | '!') expression                           # NotExpr
-    | left=expression op=('*' | '/') right=expression           # MulDivExpr
-    | left=expression op=('+' | '-') right=expression           # AddSubExpr
-    | left=expression IS notOp=NOT? NULL_KW                     # IsNullExpr
-    | left=expression notOp=NOT? IN '(' ( queryExpression | expression (',' expression)* ) ')' # InExpr
-    | left=expression notOp=NOT? (LIKE | ILIKE) right=expression # LikeExpr
-    | left=expression notOp=NOT? BETWEEN lower=expression AND upper=expression # BetweenExpr
-    | left=expression (ops+=('=' | '==' | '<' | '>' | '<=' | '>=' | '!=' | '<>') rights+=expression)+ # ComparisonExpr
-    | left=expression op=(AND | '&' | '&&') right=expression    # AndExpr
-    | left=expression op=(XOR | '^') right=expression           # XorExpr
-    | left=expression op=(OR | '|' | '||') right=expression     # OrExpr
+expression : orExpr ;
+orExpr: firstArg=xorExpr ((OR | '|' | '||') args+=xorExpr)* ;
+xorExpr: firstArg=andExpr ((XOR | '^') args+=andExpr)* ;
+andExpr: firstArg=notExpr ((AND | '&' | '&&') args+=notExpr)* ;
+notExpr: op=(NOT | '~' | '!') exprNot=notExpr | exprPass=cmpExpr;
+
+cmpExpr
+    : left=mathExpr (ops+=cmpOp rights+=mathExpr)+                         # ComparisonExpr
+    | left=mathExpr op=isNullOp                                            # IsNullExpr
+    | left=mathExpr op=inOp right=arrayExpression                          # InExpr
+    | left=mathExpr op=likeOp right=mathExpr                               # LikeExpr
+    | left=mathExpr notOp=NOT? BETWEEN lower=mathExpr AND upper=mathExpr   # BetweenExpr
+    | mathExpr                                                             # MathFallthrough
     ;
+
+// =====================================================================
+// PART 2: ANTLR 4 STYLE (Flat Left-Recursive)
+// Great for math! No loops needed, ANTLR builds the binary tree for you.
+// =====================================================================
+mathExpr
+    : primaryExpr                                                          # PrimaryBase
+    | left=mathExpr '::' dataType                                          # CastExpr
+    | left=mathExpr op=('*' | '/') right=mathExpr                          # MulDivExpr
+    | left=mathExpr op=('+' | '-') right=mathExpr                          # AddSubExpr
+    ;
+
+// =====================================================================
+// 0. Base Elements
+// =====================================================================
+primaryExpr
+    : '(' inside=expression ')'                                            # ParenthesizedExpr
+    | '(' queryExpression ')'                                              # SubqueryExpr
+    | functionCall                                                         # FunctionExpr
+    | (tableName=identifier '.')? columnName=identifier                    # ColumnExpr
+    | (STRING_LITERAL | '-'? INT_LITERAL | '-'? FLOAT_LITERAL | TRUE | FALSE | NULL_KW)   # LiteralExpr
+    ;
+
+cmpOp: '=' | '==' | '<' | '>' | '<=' | '>=' | '!=' | '<>' ;
+isNullOp: IS NOT? NULL_KW ;
+inOp: NOT? IN ;
+likeOp: NOT? (LIKE | ILIKE) ;
+
+arrayExpression: '(' ( queryExpression | expression (',' expression)* ) ')' ;
 
 // --- Functions ---
 functionCall
@@ -82,7 +103,7 @@ functionCall
     | COUNT '(' ('*' | expression) ')'                          # CountFunction
     ;
 
-literal: STRING_LITERAL | INT_LITERAL | FLOAT_LITERAL | TRUE | FALSE | NULL_KW ;
+dataType: INT | FLOAT | BOOL | VARCHAR | STRING ;
 identifier: IDENTIFIER ;
 
 
@@ -154,8 +175,13 @@ LN:     [lL][nN] ;
 
 // Identifiers & Primitives
 IDENTIFIER: [\p{L}_] [\p{L}\p{Nd}_]* ;
-FLOAT_LITERAL: [0-9]+ '.' [0-9]+ ;
 INT_LITERAL:   [0-9]+ ;
+FLOAT_LITERAL
+    : [0-9]+ '.' [0-9]* EXPONENT?   // Matches 1.2, 1., 1.2e3, 1.2E-5
+    | '.' [0-9]+ EXPONENT?          // Matches .5, .5e-2
+    | [0-9]+ EXPONENT               // Matches 1e3 (No dot, but has exponent)
+    ;
+fragment EXPONENT: [eE] [+-]? [0-9]+ ;
 STRING_LITERAL: '\'' ( ~['] | '\'\'' )*? '\'' ;
 
 SINGLE_LINE_COMMENT: ('--' | '//' | '#') ~[\r\n]* -> skip ;
