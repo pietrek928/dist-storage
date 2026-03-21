@@ -1,6 +1,7 @@
 #include "resolver.h"
 
 
+#include <netinet/in.h>
 #include <vector>
 
 #include <grpc/support/log.h>
@@ -9,6 +10,8 @@
 #include <core/config/core_configuration.h>
 
 #include <net.pb.h>
+#include <net/tcpv4.h>
+#include <peer/message.h>
 #include "ref_counted_arg.h"
 
 
@@ -18,10 +21,10 @@ class HolePunchArg: public grpc_core::RefCounted<HolePunchArg> {
 };
 
 NodeResolver::NodeResolver(
-    std::string node_id,
+    const std::string &node_id,
     grpc_core::RefCountedPtr<RefCountedArgPtr<message::Message::Stub>> stub,
     grpc_core::ResolverArgs args
-)   : node_id_(std::move(node_id)),
+)   : node_id(node_id),
       sig_stub_(std::move(stub)),
       work_serializer_(std::move(args.work_serializer)),
       result_handler_(std::move(args.result_handler)),
@@ -34,25 +37,35 @@ void NodeResolver::StartLocked() {
 }
 
 void NodeResolver::StartHolePunching() {
-    hole_punch_context_.Clear();
+    hole_punch_context_.emplace();
+
+    std::random_device rd;
+    auto port_reservation = tcpv4_bind_random_port(
+        // TODO: get those ports from config
+        rd, 12345, 23456, INADDR_ANY
+    );
 
     // 2. Prepare Hole Punch Request
     // You might populate this based on data from 'negotiation_resp_'
-    hole_punch_req_.set_target_node_id(node_id_);
+
+    net::HolePunchParameters params;
+    params.set_start_time_ms(1234); // TODO: from timestamp
+    params.set_connect_count(4); // TODO: values from some config
+    params.set_connect_sec_start(5);
+    params.set_connect_sec_max(6);
+    params.set_connect_sec_scale(2.5);
+
+    message::MessageData data;
+    data.set_recipient_id(node_id);
+    data.set_allocated_hole_punch(&params);
+    hole_punch_req_ = auth_store->sign_message(data);
 
     // Construct the HolePunchParameters to send to the signaling server (if your protocol requires it)
     // Or, we might just be asking the signaling server to coordinate it.
     // Here I assume we send a specific HolePunch RPC.
 
-    auto* hp_params = hole_punch_req_.mutable_hole_punch_params(); // Assuming your SignalingRequest has this field
-    hp_params->set_start_time_ms(123456789); // Example: syncing time
-    hp_params->set_listen_first(true);       // Determine role
-    // ... populate src/dst ips from negotiation_resp_ if needed
-
-    // We also prepare local C++ hole punch params
-    final_hole_punch_params_.Clear();
-
-    sig_stub_->get()->async()->Send(&hole_punch_context_, &hole_punch_req_, &hole_punch_resp_,
+    sig_stub_->get()->async()->Send(
+        &hole_punch_context_.value(), &hole_punch_req_, &hole_punch_resp_,
         [this](grpc::Status status) {
             work_serializer_->Run([this, status]() {
                 OnHolePunchingDone(status);

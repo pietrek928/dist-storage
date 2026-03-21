@@ -15,6 +15,7 @@
 
 #include <message.pb.h>
 #include <message.grpc.pb.h>
+#include <peer/store.h>
 
 #include "ref_counted_arg.h"
 
@@ -45,17 +46,19 @@ private:
     void FinishResolution();
 
     // Data
-    std::string node_id_;
+    std::string node_id;
     grpc_core::RefCountedPtr<RefCountedArgPtr<message::Message::Stub>> sig_stub_;
     std::shared_ptr<grpc_core::WorkSerializer> work_serializer_;
     std::unique_ptr<grpc_core::Resolver::ResultHandler> result_handler_;
     grpc_core::ChannelArgs channel_args_;
 
     // Contexts & Responses (Member variables to keep them alive during async calls)
-    grpc::ClientContext hole_punch_context_;
+    std::optional<grpc::ClientContext> hole_punch_context_;
 
     message::SignedMessage hole_punch_req_;
     message::SendMessageResponse hole_punch_resp_;
 
     bool resolving_ = false;
+
+    std::shared_ptr<AuthStoreStore> auth_store;
 };

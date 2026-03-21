@@ -25,7 +25,6 @@ message HolePunchParameters {
 
   uint64 start_time_ms = 5;
 
-  bool listen_first = 6;
   float connect_sec_start = 7;
   float connect_sec_max = 8;
   float connect_sec_scale = 9;

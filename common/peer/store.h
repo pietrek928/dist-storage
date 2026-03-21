@@ -13,7 +13,7 @@
 #include <message.pb.h>
 
 
-class PeerStore {
+class AuthStoreStore {
     std::mutex lock;
     typedef struct PeerInfo {
         timespec last_update;
@@ -21,6 +21,9 @@ class PeerStore {
         SSLVerifier verifier;
     } PeerInfo;
 
+    std::string self_id;
+    std::string self_cert;
+    SSLSigner signer;
     std::map<std::string, PeerInfo> peers;
 
     public:
@@ -28,4 +31,5 @@ class PeerStore {
     bool has(const std::string &id);
     void push(const std::string &cert);
     bool validate_message(const message::SignedMessage &msg); // omit certificate - just based on cached pub key
+    message::SignedMessage sign_message(const message::MessageData &message_data, bool add_cert = true);
 };
