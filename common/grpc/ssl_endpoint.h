@@ -35,7 +35,7 @@ class SSLEndpoint : public grpc_exp::EventEngine::Endpoint,
                  grpc_exp::SliceBuffer* data);
 
 public:
-    SSLEndpoint(int fd, SSL* ssl, std::shared_ptr<PollEngine> poller);
+    SSLEndpoint(unique_fd fd, SSL_ptr ssl, std::shared_ptr<PollEngine> poller);
     ~SSLEndpoint() override;
 
     bool Read(absl::AnyInvocable<void(absl::Status)> on_read,
@@ -44,6 +44,7 @@ public:
     bool Write(absl::AnyInvocable<void(absl::Status)> on_write,
                grpc_exp::SliceBuffer* data, const WriteArgs args) override;
 
+    std::shared_ptr<grpc_exp::EventEngine::Endpoint::TelemetryInfo> GetTelemetryInfo() const override;
     const grpc_exp::EventEngine::ResolvedAddress& GetPeerAddress() const override;
     const grpc_exp::EventEngine::ResolvedAddress& GetLocalAddress() const override;
 };

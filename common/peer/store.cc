@@ -45,8 +45,12 @@ bool AuthStoreStore::validate_message(const message::SignedMessage &msg) {
 }
 
 message::SignedMessage AuthStoreStore::sign_message(
-    const message::MessageData &message_data, bool add_cert
+    const message::MessageData &message_data, const std::string recipient_id, bool add_cert
 ) {
+    message::MessageData send_data = message_data;
+    send_data.set_recipient_id(recipient_id);
+    send_data.set_has_recipient_cert(has(recipient_id));
+
     message::SignedMessage msg;
     msg.set_sender_id(self_id);
     msg.set_ttl(4);
@@ -54,6 +58,6 @@ message::SignedMessage AuthStoreStore::sign_message(
         msg.set_sender_cert(self_cert);  // TODO: not always send cert - its big
     }
 
-    fillMessageData(&msg, message_data, signer);
+    fillMessageData(&msg, send_data, signer);
     return msg;
 }

@@ -29,8 +29,8 @@ grpc_exp::EventEngine::ResolvedAddress populate_peer_addr(int fd) {
     return grpc_exp::EventEngine::ResolvedAddress();
 }
 
-SSLEndpoint::SSLEndpoint(int fd, SSL* ssl, std::shared_ptr<PollEngine> poller)
-    : fd_(fd), ssl_(ssl), poller_(poller) {
+SSLEndpoint::SSLEndpoint(unique_fd fd, SSL_ptr ssl, std::shared_ptr<PollEngine> poller)
+    : fd_(std::move(fd)), ssl_(std::move(ssl)), poller_(poller) {
     // Enable partial writes to handle non-blocking IO correctly
     SSL_set_mode(ssl_, SSL_MODE_ENABLE_PARTIAL_WRITE | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
     peer_addr_ = populate_peer_addr(fd_);
@@ -38,10 +38,8 @@ SSLEndpoint::SSLEndpoint(int fd, SSL* ssl, std::shared_ptr<PollEngine> poller)
 }
 
 SSLEndpoint::~SSLEndpoint() {
-    // Ensure we unregister from poller so no callbacks fire after destruction
-    if (poller_) {
-        poller_->pop(fd_);
-    }
+    if (poller_) { poller_->pop(fd_); }
+    if (ssl_) { SSL_free(ssl_); }
 }
 
 bool SSLEndpoint::Read(absl::AnyInvocable<void(absl::Status)> on_read,
@@ -184,6 +182,10 @@ void SSLEndpoint::DoWrite(absl::AnyInvocable<void(absl::Status)> on_write,
     // --- Case 4: Buffer Empty (Success) ---
     lock.unlock();
     on_write(absl::OkStatus());
+}
+
+std::shared_ptr<grpc_exp::EventEngine::Endpoint::TelemetryInfo> SSLEndpoint::GetTelemetryInfo() const {
+    return nullptr;
 }
 
 const grpc_exp::EventEngine::ResolvedAddress& SSLEndpoint::GetPeerAddress() const {

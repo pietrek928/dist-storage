@@ -1,6 +1,7 @@
 #include "tcpv4.h"
 
 #include <cstdint>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdexcept>
@@ -44,6 +45,25 @@ socket_t tcpv4_new_socket(bool blocking) {
         "creating socket", fd = socket(AF_INET, SOCK_STREAM | flags, 0)
     );
     return fd;
+}
+
+void tcpv4_set_blocking(socket_t fd, bool blocking) {
+    int flags;
+    ccall("getting socket flags", flags = fcntl(fd, F_GETFL, 0));
+    if (blocking) {
+        flags &= ~O_NONBLOCK;
+    } else {
+        flags |= O_NONBLOCK;
+    }
+    ccall("setting socket blocking", fcntl(fd, F_SETFL, flags));
+}
+
+void tcpv4_set_timeout(socket_t fd, float timeout_sec) {
+    struct timeval tv;
+    tv.tv_sec = static_cast<int>(timeout_sec);
+    tv.tv_usec = static_cast<int>((timeout_sec - tv.tv_sec) * 1000000);
+    ccall("setting socket recv timeout", setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv));
+    ccall("setting socket send timeout", setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (const char*)&tv, sizeof tv));
 }
 
 void tcpv4_close_socket(socket_t fd) {

@@ -4,8 +4,10 @@
 #include <core/config/core_configuration.h>
 #include <core/resolver/resolver_factory.h>
 
-#include <utils/guard_ptr.h>
+#include <memory>
 #include <message.grpc.pb.h>
+#include <utils/guard_ptr.h>
+#include <peer/store.h>
 
 #include "ref_counted_arg.h"
 #include "resolver.h"
@@ -14,6 +16,8 @@
 class NodeResolverFactory : public grpc_core::ResolverFactory {
 public:
     static constexpr char kMessageStubArgKey[] = "grpc.custom.message_stub";
+
+    std::shared_ptr<AuthStoreStore> auth_store = std::make_shared<AuthStoreStore>();
 
     absl::string_view scheme() const override;
     bool IsValidUri(const grpc_core::URI& uri) const override;
@@ -57,7 +61,7 @@ grpc_core::OrphanablePtr<grpc_core::Resolver> NodeResolverFactory::CreateResolve
 
     return grpc_core::OrphanablePtr<grpc_core::Resolver>(
         static_cast<grpc_core::Resolver*>(
-            new NodeResolver(std::move(node_id), std::move(stub), std::move(args))
+            new NodeResolver(std::move(node_id), std::move(stub), std::move(args), auth_store)
         )
     );
 }

@@ -13,6 +13,7 @@ message MessageData {
     net.HolePunchParameters hole_punch = 3;
     net.ListenParameters listen = 4;
   };
+  bool has_recipient_cert = 5;
 };
 
 enum SendMessageStatus {

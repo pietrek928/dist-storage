@@ -27,6 +27,8 @@ struct ReservedSocket {
 };
 
 socket_t tcpv4_new_socket(bool blocking = true);
+void tcpv4_set_blocking(socket_t fd, bool blocking = true);
+void tcpv4_set_timeout(socket_t fd, float timeout_sec);
 void tcpv4_close_socket(socket_t fd);
 void tcpv4_port_reuse(int fd, int val = 1);
 void tcpv4_bind_port(socket_t fd, const net::IPV4Addr &bind_addr);

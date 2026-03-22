@@ -31,5 +31,7 @@ class AuthStoreStore {
     bool has(const std::string &id);
     void push(const std::string &cert);
     bool validate_message(const message::SignedMessage &msg); // omit certificate - just based on cached pub key
-    message::SignedMessage sign_message(const message::MessageData &message_data, bool add_cert = true);
+    message::SignedMessage sign_message(
+        const message::MessageData &message_data, const std::string recipient_id, bool add_cert = false
+    );
 };
