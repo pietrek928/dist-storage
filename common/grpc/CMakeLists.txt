@@ -1,11 +1,17 @@
-# Define an Object Library (outputs .o files)
-add_library(grpc_transport_obj OBJECT
+set(DIST_STORAGE_GRPC_SRCS
     ssl_endpoint.cc
     resolver.cc
+    engine.cc
+    ../net/tcpv4.cc
+    ../utils/sys/err.cc
+    ../utils/sys/call_check.cc
+    ../net/call_check.cc
+    ../utils/poll_engine.cc
 )
 
-# Apply internal header paths to these object files
-target_include_directories(grpc_transport_obj PRIVATE
+add_library(dist_storage_grpc STATIC ${DIST_STORAGE_GRPC_SRCS})
+
+target_include_directories(dist_storage_grpc PRIVATE
     ${grpc_SOURCE_DIR}/include
     ${grpc_SOURCE_DIR}/src
     ${grpc_SOURCE_DIR}
@@ -17,9 +23,13 @@ target_include_directories(grpc_transport_obj PRIVATE
     ${grpc_BINARY_DIR}
 )
 
-# You still need to link dependencies so the .o knows about the types
-target_link_libraries(grpc_transport_obj PRIVATE
+target_include_directories(dist_storage_grpc PUBLIC
+    "${CMAKE_SOURCE_DIR}/common"
+)
+
+target_link_libraries(dist_storage_grpc PUBLIC
     grpc++
     absl::status
     absl::statusor
+    absl::log
 )

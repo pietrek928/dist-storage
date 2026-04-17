@@ -3,6 +3,8 @@
 #include <thread>
 #include <grpc/event_engine/endpoint_config.h>
 
+#include <absl/log/log.h>
+
 #include <net/tcpv4.h>
 
 #include "resolver.h"
@@ -69,6 +71,16 @@ HolePunchEventEngine::HolePunchEventEngine(std::shared_ptr<PollEngine> poller, S
     : default_engine_(grpc_exp::CreateEventEngine()),
         poller_(std::move(poller)),
         ssl_ctx_(ssl_ctx) {}
+
+void HolePunchEventEngine::Run(Closure* closure) {
+    default_engine_->Run(closure);
+}
+
+HolePunchEventEngine::TaskHandle HolePunchEventEngine::RunAfter(
+    Duration when, Closure* closure
+) {
+    return default_engine_->RunAfter(when, closure);
+}
 
 void HolePunchEventEngine::Run(absl::AnyInvocable<void()> task) {
     default_engine_->Run(std::move(task));
@@ -223,4 +235,33 @@ void HolePunchEventEngine::AcceptIncomingHolePunch(std::unique_ptr<grpc_exp::Eve
     } else {
         LOG(ERROR) << "Cannot inject connection: gRPC Server is not listening!";
     }
+}
+
+absl::Status HolePunchEventEngine::RunSignaledIncomingHolePunch(
+    unique_fd reserved_fd, net::HolePunchParameters params
+) {
+    absl::StatusOr<std::unique_ptr<grpc_exp::EventEngine::Endpoint>> outcome =
+        absl::FailedPreconditionError("hole punch not completed");
+
+    PerformHolePunchAndHandshake(
+        std::move(reserved_fd), params,
+        false,
+        poller_, ssl_ctx_, nullptr,
+        [&](absl::StatusOr<std::unique_ptr<SSLEndpoint>> r) {
+            if (!r.ok()) {
+                outcome = r.status();
+                return;
+            }
+            std::unique_ptr<SSLEndpoint> up = std::move(r).value();
+            std::unique_ptr<grpc_exp::EventEngine::Endpoint> ep(
+                static_cast<grpc_exp::EventEngine::Endpoint*>(up.release()));
+            outcome = std::move(ep);
+        }
+    );
+
+    if (!outcome.ok()) {
+        return outcome.status();
+    }
+    AcceptIncomingHolePunch(std::move(outcome).value());
+    return absl::OkStatus();
 }

@@ -45,7 +45,7 @@ class GRPCAllocableHandler : public GRPCHandler {
     }
 };
 
-template<class Tservice, class Trequest, class Tresult>
+template<class Tservice, class Trequest, class Tresult, class Derived>
 class GRPCBasicHandler : public GRPCAllocableHandler {
     protected:
     Tservice *service = NULL;
@@ -53,16 +53,18 @@ class GRPCBasicHandler : public GRPCAllocableHandler {
     Tresult response;
     grpc::ServerAsyncResponseWriter<Tresult> responder;
 
-    void bind(grpc::ServerCompletionQueue *cq) {
-        service->RequestWrite(&ctx, &request, &responder, cq, cq, this);
-    }
+    virtual void bind(grpc::ServerCompletionQueue *cq) = 0;
 
-    void handle_request() {
+    virtual void handle_request() {
         throw std::runtime_error("not implemented");
     }
 
+    virtual grpc::Status finish_grpc_status() {
+        return grpc::Status::OK;
+    }
+
     void finish() {
-        responder.Finish(response, grpc::Status::OK, this);
+        responder.Finish(response, finish_grpc_status(), this);
         state = 12345;
     }
 
@@ -75,10 +77,10 @@ class GRPCBasicHandler : public GRPCAllocableHandler {
 
     void process(grpc::ServerCompletionQueue *cq, bool running) {
         switch(state++) {
-            case 0: bind(cq); break;
+            case 0: this->bind(cq); break;
             case 1:
-                if (running) {  // Clone for new request
-                    (new decltype(*this)(*this))->process(cq, running);
+                if (running) {  // Clone for new request (must preserve derived vtable)
+                    (new Derived(static_cast<const Derived&>(*this)))->process(cq, running);
                 }
                 break;
             case 2:
@@ -96,6 +98,8 @@ class GRPCBasicHandler : public GRPCAllocableHandler {
 template<class Tservice, class Trequest, class Tresult>
 class GRPCStreamHandler : public GRPCAllocableHandler {
     protected:
+    // Used by RequestStream / Request*. Clone preserves this pointer (ctx/stream are fresh).
+    Tservice* service = nullptr;
     Trequest request;
     Tresult response;
     grpc::ServerAsyncReaderWriter<Tresult, Trequest> stream;
@@ -123,7 +127,9 @@ class GRPCStreamHandler : public GRPCAllocableHandler {
     public:
     GRPCStreamHandler()
         : stream(&ctx) {}
+    explicit GRPCStreamHandler(Tservice* svc)
+        : service(svc), stream(&ctx) {}
     GRPCStreamHandler(const GRPCStreamHandler& other)
-    : GRPCStreamHandler() {}
+        : service(other.service), stream(&ctx) {}
     GRPCStreamHandler(GRPCStreamHandler&& other) = delete;
 };

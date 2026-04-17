@@ -1,4 +1,4 @@
-#include "sys_call_check.h"
+#include <utils/exception.h>
 
 #include <string>
 #include <cstring>

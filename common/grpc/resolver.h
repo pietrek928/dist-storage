@@ -38,6 +38,11 @@ public:
     int Cmp(const NegotiatedHolePunchArg& other) const {
         return grpc_core::QsortCompare(this, &other);
     }
+
+    // gRPC ChannelArgs pointer vtable (ref-counted objects must expose this).
+    static int ChannelArgsCompare(const NegotiatedHolePunchArg* a, const NegotiatedHolePunchArg* b) {
+        return grpc_core::QsortCompare(a, b);
+    }
 };
 
 class NodeResolver : public grpc_core::Resolver {
@@ -48,7 +53,7 @@ public:
         const std::string &node_id,
         grpc_core::RefCountedPtr<RefCountedArgPtr<message::Message::Stub>> stub,
         grpc_core::ResolverArgs args,
-        std::shared_ptr<AuthStoreStore> auth_store
+        std::shared_ptr<AuthStore> auth_store
     );
 
     void StartLocked() override;
@@ -82,5 +87,5 @@ private:
 
     bool resolving_ = false;
 
-    std::shared_ptr<AuthStoreStore> auth_store;
+    std::shared_ptr<AuthStore> auth_store;
 };

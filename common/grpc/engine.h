@@ -5,9 +5,12 @@
 #include <atomic>
 #include <grpc/event_engine/event_engine.h>
 
+#include <absl/status/status.h>
+#include <absl/status/statusor.h>
 #include <net.pb.h>
 #include <crypto/ssl.h>
 #include <utils/poll_engine.h>
+#include <utils/unique_fd.h>
 
 namespace grpc_exp = grpc_event_engine::experimental;
 
@@ -77,6 +80,8 @@ public:
     ~HolePunchEventEngine() override = default;
 
     // --- DELEGATED METHODS ---
+    void Run(Closure* closure) override;
+    TaskHandle RunAfter(Duration when, Closure* closure) override;
     void Run(absl::AnyInvocable<void()> task) override;
     TaskHandle RunAfter(Duration when, absl::AnyInvocable<void()> task) override;
     bool Cancel(TaskHandle handle) override;
@@ -105,4 +110,8 @@ public:
         std::unique_ptr<grpc_exp::MemoryAllocatorFactory> memory_allocator_factory
     ) override;
     void AcceptIncomingHolePunch(std::unique_ptr<grpc_exp::EventEngine::Endpoint> ep);
+
+    // Synchronous server-side path after signaling: punch + TLS (accept) + inject into listener.
+    // Blocks the caller while the punch and handshake run (may block a CQ thread).
+    absl::Status RunSignaledIncomingHolePunch(unique_fd reserved_fd, net::HolePunchParameters params);
 };

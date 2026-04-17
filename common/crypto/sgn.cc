@@ -24,7 +24,7 @@ SSLSigner::SSLSigner(int type, const byte_t *priv_key, size_t priv_key_len, cons
     ssl_call("EVP_MD_CTX_create", ctx = EVP_MD_CTX_create());
 
     ssl_call(
-        "signer - inituializing signing context",
+        "signer - initializing signing context",
         EVP_DigestSignInit(ctx, NULL, md, NULL, pkey)
     );
 

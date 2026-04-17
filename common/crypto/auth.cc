@@ -1,5 +1,7 @@
 #include "auth.h"
 
+#include <stdexcept>
+
 #include "call_check.h"
 #include "sgn.h"
 
@@ -10,9 +12,14 @@ constexpr static char PEER_ID_SEED_1[] = "834h804n82y387ynx2307ny8x70236n4786yn3
 constexpr static char PEER_ID_SEED_2[] = "83n1-9348yc5n780345mn83485mt483mtg7tm58c48";
 constexpr static char PEER_ID_SEED_3[] = "c45e654wv653w6537v6brftrxwqt56bf79n8t7f6f6";
 constexpr static char PEER_ID_SEED_4[] = "7b5es75nm698g098ym76e534xcw76v8r67bt9tbt6t";
-void peer_id_from_hash(const byte_t *data, size_t data_len, const char *hash_algo, byte_t *out_buf) {
+size_t peer_id_from_hash(
+    const byte_t *data, size_t data_len, const char *hash_algo, byte_t *out_buf, size_t out_buf_size
+) {
     SSLHasher hasher(hash_algo);
-    auto hash_size = hasher.digest_size();
+    const auto hash_size = hasher.digest_size();
+    if (out_buf_size < hash_size) {
+        throw std::invalid_argument("out_buf too small for peer id hash");
+    }
 
     hasher.start();
     hasher.put((const byte_t *)PEER_ID_SEED_1, sizeof(PEER_ID_SEED_1));
@@ -28,26 +35,32 @@ void peer_id_from_hash(const byte_t *data, size_t data_len, const char *hash_alg
         hasher.put((const byte_t *)PEER_ID_SEED_4, sizeof(PEER_ID_SEED_4));
         hasher.finish(out_buf);
     }
+    return hash_size;
 }
 
-void peer_id_from_pubkey(EVP_PKEY *pubkey, const char *hash_algo, byte_t *out_buf) {
+size_t peer_id_from_pubkey(
+    EVP_PKEY *pubkey, const char *hash_algo, byte_t *out_buf, size_t out_buf_size
+) {
     SSL_DATA_ptr pubkey_subject_info;
     auto subject_len = i2d_PUBKEY(pubkey, (unsigned char **)&pubkey_subject_info.ptr);
     if (subject_len <= 0 || !pubkey_subject_info) {
         throw SSLError("cert - transforming to subject form failed");
     }
 
-    peer_id_from_hash(pubkey_subject_info, subject_len, hash_algo, out_buf);
+    return peer_id_from_hash(pubkey_subject_info, subject_len, hash_algo, out_buf, out_buf_size);
 }
 
-void peer_id_from_cert(const byte_t *cert, size_t cert_len, const char *hash_algo, byte_t *out_buf) {
+size_t peer_id_from_cert(
+    const byte_t *cert, size_t cert_len, const char *hash_algo, byte_t *out_buf, size_t out_buf_size
+) {
     X509_ptr x509;
     EVP_PKEY_ptr pubkey;
 
-    ssl_call("converting 509 to string", x509 = d2i_X509(nullptr, cert, cert_len));
+    const byte_t *p = cert;
+    ssl_call("converting 509 to string", x509 = d2i_X509(nullptr, &p, static_cast<long>(cert_len)));
     ssl_call("getting public key", pubkey = X509_get_pubkey(x509));
 
-    peer_id_from_pubkey(pubkey, hash_algo, out_buf);
+    return peer_id_from_pubkey(pubkey, hash_algo, out_buf, out_buf_size);
 }
 
 std::string x509_to_string(X509* cert) {

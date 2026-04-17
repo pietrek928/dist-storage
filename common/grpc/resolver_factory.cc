@@ -17,7 +17,7 @@ class NodeResolverFactory : public grpc_core::ResolverFactory {
 public:
     static constexpr char kMessageStubArgKey[] = "grpc.custom.message_stub";
 
-    std::shared_ptr<AuthStoreStore> auth_store = std::make_shared<AuthStoreStore>();
+    std::shared_ptr<AuthStore> auth_store = std::make_shared<AuthStore>();
 
     absl::string_view scheme() const override;
     bool IsValidUri(const grpc_core::URI& uri) const override;

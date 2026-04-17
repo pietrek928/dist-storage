@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package message;
 
+import "google/protobuf/empty.proto";
 import "net.proto";
 import "minion.proto";
 
@@ -11,7 +12,7 @@ message MessageData {
   oneof m {
     minion.Register minion_register = 2;
     net.HolePunchParameters hole_punch = 3;
-    net.ListenParameters listen = 4;
+    net.IPAddr listen = 4;
   };
   bool has_recipient_cert = 5;
 };
@@ -40,4 +41,5 @@ service Message {
   rpc Send(SignedMessage) returns (SendMessageResponse);
   rpc SendAsync(SignedMessage) returns (SendMessageResponse);
   rpc Stream(stream SignedMessage) returns (stream SignedMessage);
+  rpc TellMyAddr(google.protobuf.Empty) returns (net.IPAddr);
 };

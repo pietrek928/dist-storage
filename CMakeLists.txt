@@ -1,8 +1,12 @@
-cmake_minimum_required(VERSION 3.13...4.2)
+cmake_minimum_required(VERSION 4.0)
 project(dist_storage CXX)
 
 # Save commands for vscode clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Shared include root for project headers (<utils/...>, <grpc/...>, etc.)
+add_library(dist_storage_common INTERFACE)
+target_include_directories(dist_storage_common INTERFACE "${CMAKE_SOURCE_DIR}/common")
 
 ################ GRPC
 # 1. Settings to fix compilation errors
@@ -26,20 +30,22 @@ set(gRPC_SSL_PROVIDER libreSSL CACHE STRING "" FORCE)
 
 # 4. Fetch gRPC (Standard way)
 include(FetchContent)
+get_filename_component(_grpc_src "${FETCHCONTENT_BASE_DIR}/grpc-src" ABSOLUTE)
 FetchContent_Declare(
   gRPC
   GIT_REPOSITORY https://github.com/grpc/grpc.git
   GIT_TAG        v1.75.1
+  # gRPC v1.75.1 third_party: protobuf sets CMP0141 OLD; re2 uses cmake_minimum_required < 3.10.
+  PATCH_COMMAND
+    ${CMAKE_COMMAND}
+    -D "GRPC_PATCH_ROOT=${_grpc_src}"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/grpc_third_party_patch.cmake"
 )
-# Use this instead of MakeAvailable to ensure variables are set before sub-add_subdirectory
-FetchContent_GetProperties(gRPC)
-if(NOT grpc_POPULATED)
-  FetchContent_Populate(gRPC)
-  add_subdirectory(${grpc_SOURCE_DIR} ${grpc_BINARY_DIR} EXCLUDE_FROM_ALL)
-endif()
+FetchContent_MakeAvailable(gRPC)
 ####################
 
 
+add_subdirectory(common/crypto)
 add_subdirectory(common/proto)
 include_directories(${CMAKE_SOURCE_DIR}/common)
 include_directories(${CMAKE_SOURCE_DIR}/common/proto/cc)
@@ -47,4 +53,5 @@ include_directories(${CMAKE_SOURCE_DIR}/common/proto/cc)
 add_subdirectory(common/grpc)
 add_subdirectory(common/peer)
 add_subdirectory(minion/obj_store)
+add_subdirectory(minion/message)
 add_subdirectory(minion/planner/parse)

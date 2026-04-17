@@ -1,16 +1,19 @@
-# Define an Object Library (outputs .o files)
-add_library(peer_obj OBJECT
+add_library(dist_storage_peer STATIC
     message.cc
     store.cc
+    ../utils/sys/time.cc
 )
 
-# Apply internal header paths to these object files
-target_include_directories(peer_obj PRIVATE
+target_include_directories(dist_storage_peer PRIVATE
     ${grpc_SOURCE_DIR}/include
     ${grpc_BINARY_DIR}
 )
 
-# You still need to link dependencies so the .o knows about the types
-target_link_libraries(peer_obj PRIVATE
+target_include_directories(dist_storage_peer PUBLIC
+    "${CMAKE_SOURCE_DIR}/common"
+)
+
+target_link_libraries(dist_storage_peer PUBLIC
+    dist_storage_crypto
     grpc++
 )

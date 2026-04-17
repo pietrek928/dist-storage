@@ -1,6 +1,7 @@
 #pragma once
 
 #include <random>
+#include <string>
 #include <netinet/in.h>
 
 #include <net.pb.h>
@@ -38,6 +39,10 @@ void tcpv4_connect_abort(socket_t fd);
 void tcpv4_listen(socket_t fd, int backlog = 1);
 TCPv4AcceptResult tcpv4_accept(socket_t fd, bool create_blocking = true);
 TCPv4AcceptResult tcpv4_accept_unsafe(socket_t fd, bool create_blocking);
+void fill_src_ipv4_from_socket(net::IPV4Addr* src_ipv4, const unique_fd& sock);
+
+/// Parses gRPC `ServerContext::peer()` URI (`ipv4:host:port`) into IPv4 branch of net::IPAddr.
+bool grpc_peer_uri_to_net_ip_addr(const std::string& peer, net::IPAddr* out);
 socket_t tcpv4_hole_punch(unique_fd listen_fd, const net::HolePunchParameters &settings);
 ReservedSocket tcpv4_bind_random_port(
     std::random_device &rd,

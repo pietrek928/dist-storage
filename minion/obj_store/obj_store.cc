@@ -27,10 +27,16 @@ __off_t seek_offset(int fd, int64_t offset) {
 
 
 class WriteHandler : public GRPCBasicHandler<
-    obj_store::ObjStore::AsyncService, obj_store::WriteRequest, obj_store::Result
+    obj_store::ObjStore::AsyncService, obj_store::WriteRequest, obj_store::Result, WriteHandler
 > {
+    using GRPCBasicHandler::GRPCBasicHandler;
+
+    void bind(grpc::ServerCompletionQueue* cq) override {
+        service->RequestWrite(&ctx, &request, &responder, cq, cq, this);
+    }
+
     // TODO: error logging
-    void handle_request() {
+    void handle_request() override {
         auto & id = request.id();
         auto & data = request.data();
 
@@ -58,9 +64,17 @@ class WriteHandler : public GRPCBasicHandler<
 };
 
 class ReadHandler : public GRPCBasicHandler<
-    obj_store::ObjStore::AsyncService, obj_store::ReadRequest, obj_store::ContentResult
+    obj_store::ObjStore::AsyncService,
+    obj_store::ReadRequest,
+    obj_store::ContentResult,
+    ReadHandler
 > {
-    void handle_request() {
+    using GRPCBasicHandler::GRPCBasicHandler;
+    void bind(grpc::ServerCompletionQueue* cq) override {
+        service->RequestRead(&ctx, &request, &responder, cq, cq, this);
+    }
+
+    void handle_request() override {
         auto & id = request.id();
 
         // TODO: auth
@@ -95,9 +109,17 @@ class ReadHandler : public GRPCBasicHandler<
 };
 
 class DeleteHandler : public GRPCBasicHandler<
-    obj_store::ObjStore::AsyncService, obj_store::DeleteRequest, obj_store::Result
+    obj_store::ObjStore::AsyncService,
+    obj_store::DeleteRequest,
+    obj_store::Result,
+    DeleteHandler
 > {
-    void handle_request() {
+    using GRPCBasicHandler::GRPCBasicHandler;
+    void bind(grpc::ServerCompletionQueue* cq) override {
+        service->RequestDelete(&ctx, &request, &responder, cq, cq, this);
+    }
+
+    void handle_request() override {
         auto & id = request.id();
 
         // TODO: auth
@@ -117,15 +139,21 @@ int main() {
     std::string server_address("0.0.0.0:50051");
 
     obj_store::ObjStore::AsyncService service;
-    grpc::CompletionQueue cq;
-
     grpc::ServerBuilder builder;
     builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
     builder.RegisterService(&service);
+    std::unique_ptr<grpc::ServerCompletionQueue> cq = builder.AddCompletionQueue();
     auto server = builder.BuildAndStart();
-    TaskRunner runner(2);
 
-    service.RequestRead();
+    (new WriteHandler(&service))->process(cq.get(), true);
+    (new ReadHandler(&service))->process(cq.get(), true);
+    (new DeleteHandler(&service))->process(cq.get(), true);
+
+    void* tag = nullptr;
+    bool ok = true;
+    while (cq->Next(&tag, &ok)) {
+        static_cast<GRPCHandler*>(tag)->process(cq.get(), ok);
+    }
 
     return 0;
 }

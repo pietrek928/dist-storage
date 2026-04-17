@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <mutex>
 #include <openssl/types.h>
 #include <string>
@@ -13,8 +14,8 @@
 #include <message.pb.h>
 
 
-class AuthStoreStore {
-    std::mutex lock;
+class AuthStore {
+    mutable std::mutex lock;
     typedef struct PeerInfo {
         timespec last_update;
         std::string cert;
@@ -23,12 +24,17 @@ class AuthStoreStore {
 
     std::string self_id;
     std::string self_cert;
-    SSLSigner signer;
+    std::unique_ptr<SSLSigner> signer;
+    std::map<std::string, PeerInfo> root_authorities;
     std::map<std::string, PeerInfo> peers;
 
     public:
 
+    /** Server's peer id when configured (e.g. for signing); may be empty. Thread-safe. */
+    bool is_self(const std::string& peer_id) const;
+
     bool has(const std::string &id);
+    void push_authority(const std::string &authority_id, const std::string &cert);
     void push(const std::string &cert);
     bool validate_message(const message::SignedMessage &msg); // omit certificate - just based on cached pub key
     message::SignedMessage sign_message(

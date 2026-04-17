@@ -18,7 +18,7 @@ NodeResolver::NodeResolver(
     const std::string &node_id,
     grpc_core::RefCountedPtr<RefCountedArgPtr<message::Message::Stub>> stub,
     grpc_core::ResolverArgs args,
-    std::shared_ptr<AuthStoreStore> auth_store
+    std::shared_ptr<AuthStore> auth_store
 )   : node_id(node_id),
       sig_stub_(std::move(stub)),
       work_serializer_(std::move(args.work_serializer)),
@@ -48,8 +48,12 @@ void NodeResolver::StartHolePunching() {
     // 2. Prepare Hole Punch Request safely
     message::MessageData data;
     auto* params = data.mutable_hole_punch();
-    // TODO: self ip connection data for peer
-    // TODO: params->set_src_port(port_reservation->port);
+    // Resolve peer IPv4 into dst when integrating node discovery.
+    params->mutable_dst()->mutable_ipv4()->mutable_addr()->assign(4, '\0');
+    params->mutable_dst()->mutable_ipv4()->set_port(0);
+    params->mutable_src()->mutable_ipv4()->mutable_addr()->assign(4, '\0');
+    params->mutable_src()->mutable_ipv4()->set_port(static_cast<uint32_t>(current_port_reservation_->port));
+
     params->set_start_time_ms(1234); // TODO: from timestamp
     params->set_connect_count(4); // TODO: values from some config
     params->set_connect_sec_start(5);

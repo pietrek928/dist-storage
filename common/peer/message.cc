@@ -2,6 +2,33 @@
 
 #include <stdexcept>
 
+#include <absl/log/log.h>
+#include <peer/store.h>
+
+
+SignedPayloadAuthResult authenticate_signed_message_data(
+    AuthStore* store,
+    const message::SignedMessage& msg,
+    message::MessageData* data_out,
+    const char* log_prefix
+) {
+    if (!store) {
+        return SignedPayloadAuthResult::UnknownSender;
+    }
+    if (!store->has(msg.sender_id())) {
+        LOG(WARNING) << log_prefix << ": unknown sender_id";
+        return SignedPayloadAuthResult::UnknownSender;
+    }
+    if (!store->validate_message(msg)) {
+        LOG(WARNING) << log_prefix << ": signature validation failed";
+        return SignedPayloadAuthResult::BadSignature;
+    }
+    if (!data_out->ParseFromString(msg.data())) {
+        LOG(WARNING) << log_prefix << ": failed to parse MessageData payload";
+        return SignedPayloadAuthResult::BadPayload;
+    }
+    return SignedPayloadAuthResult::Ok;
+}
 
 void fillMessageData(
     message::SignedMessage* msg,

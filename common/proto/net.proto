@@ -13,22 +13,23 @@ message IPV6Addr {
   uint32 port = 2;
 };
 
+message IPAddr {
+  oneof addr {
+    IPV4Addr ipv4 = 1;
+    IPV6Addr ipv6 = 2;
+  };
+};
+
 message HolePunchParameters {
-  oneof src_addr {
-    IPV4Addr src_ipv4 = 1;
-    IPV6Addr src_ipv6 = 2;
-  };
-  oneof dst_addr {
-    IPV4Addr dst_ipv4 = 3;
-    IPV6Addr dst_ipv6 = 4;
-  };
+  IPAddr src = 1;
+  IPAddr dst = 2;
 
-  uint64 start_time_ms = 5;
+  uint64 start_time_ms = 3;
 
-  float connect_sec_start = 7;
-  float connect_sec_max = 8;
-  float connect_sec_scale = 9;
-  uint32 connect_count = 10;
+  float connect_sec_start = 4;
+  float connect_sec_max = 5;
+  float connect_sec_scale = 6;
+  uint32 connect_count = 7;
 };
 
 message ListenParameters {
