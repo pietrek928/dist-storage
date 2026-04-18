@@ -27,7 +27,10 @@ __off_t seek_offset(int fd, int64_t offset) {
 
 
 class WriteHandler : public GRPCBasicHandler<
-    obj_store::ObjStore::AsyncService, obj_store::WriteRequest, obj_store::Result, WriteHandler
+    WriteHandler,
+    obj_store::ObjStore::AsyncService,
+    obj_store::WriteRequest,
+    obj_store::Result
 > {
     using GRPCBasicHandler::GRPCBasicHandler;
 
@@ -64,10 +67,10 @@ class WriteHandler : public GRPCBasicHandler<
 };
 
 class ReadHandler : public GRPCBasicHandler<
+    ReadHandler,
     obj_store::ObjStore::AsyncService,
     obj_store::ReadRequest,
-    obj_store::ContentResult,
-    ReadHandler
+    obj_store::ContentResult
 > {
     using GRPCBasicHandler::GRPCBasicHandler;
     void bind(grpc::ServerCompletionQueue* cq) override {
@@ -109,10 +112,10 @@ class ReadHandler : public GRPCBasicHandler<
 };
 
 class DeleteHandler : public GRPCBasicHandler<
+    DeleteHandler,
     obj_store::ObjStore::AsyncService,
     obj_store::DeleteRequest,
-    obj_store::Result,
-    DeleteHandler
+    obj_store::Result
 > {
     using GRPCBasicHandler::GRPCBasicHandler;
     void bind(grpc::ServerCompletionQueue* cq) override {

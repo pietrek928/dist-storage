@@ -1,4 +1,5 @@
 set(DIST_STORAGE_GRPC_SRCS
+    addr.cc
     ssl_endpoint.cc
     resolver.cc
     engine.cc

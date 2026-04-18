@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <string>
+#include <openssl/bio.h>
 #include <openssl/x509.h>
 
 #include <utils/defs.h>
@@ -11,6 +12,7 @@
 
 
 typedef guard_ptr<X509, X509_free> X509_ptr;
+typedef guard_ptr<BIO, BIO_free> BIO_ptr;
 
 size_t peer_id_from_hash(
     const byte_t *data, size_t data_len, const char *hash_algo, byte_t *out_buf, size_t out_buf_size
@@ -23,3 +25,6 @@ size_t peer_id_from_cert(
 );
 std::string x509_to_string(X509* cert);
 X509* string_to_x509(const std::string &der_data);
+
+/// Read an X.509 certificate file (PEM text or DER). Returns DER encoding.
+std::string load_x509_der_from_pem_or_der_file(const std::string& path);

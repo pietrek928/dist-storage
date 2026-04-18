@@ -3,7 +3,7 @@
 #include <cstdlib>
 
 
-template<class Tobj, void(*free_func)(Tobj*)>
+template<class Tobj, auto free_func>
 class guard_ptr {
     public:
 

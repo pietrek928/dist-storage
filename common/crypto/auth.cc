@@ -1,6 +1,11 @@
 #include "auth.h"
 
+#include <fstream>
+#include <sstream>
 #include <stdexcept>
+
+#include <openssl/pem.h>
+#include <openssl/x509.h>
 
 #include "call_check.h"
 #include "sgn.h"
@@ -88,11 +93,42 @@ X509* string_to_x509(const std::string &der_data) {
     // Use a temporary pointer because d2i_X509 increments it
     const unsigned char* p = reinterpret_cast<const unsigned char*>(der_data.data());
 
-    X509* cert = d2i_X509(nullptr, &p, der_data.size());
+    X509_ptr cert(d2i_X509(nullptr, &p, der_data.size()));
 
     if (!cert) {
         throw SSLError("d2i_X509 failed");
     }
 
-    return cert;
+    return cert.handle();
+}
+
+static std::string read_entire_file_binary(const std::string& path) {
+    std::ifstream in(path, std::ios::binary);
+    if (!in) {
+        throw std::runtime_error("cannot open X509 file: " + path);
+    }
+    std::ostringstream buf;
+    buf << in.rdbuf();
+    return buf.str();
+}
+
+std::string load_x509_der_from_pem_or_der_file(const std::string& path) {
+    std::string contents = read_entire_file_binary(path);
+    if (contents.empty()) {
+        throw std::runtime_error("empty X509 file: " + path);
+    }
+    // Interpret as PEM if it looks like PEM; otherwise single DER cert.
+    if (contents.find("-----BEGIN") != std::string::npos) {
+        BIO_ptr bio(BIO_new_mem_buf(contents.data(), static_cast<int>(contents.size())));
+        if (!bio) {
+            throw SSLError("BIO_new_mem_buf for PEM cert");
+        }
+        X509_ptr cert(PEM_read_bio_X509(bio, nullptr, nullptr, nullptr));
+        if (!cert) {
+            throw std::runtime_error("PEM_read_bio_X509 failed for: " + path);
+        }
+        return x509_to_string(cert);
+    }
+    X509_ptr cert(string_to_x509(contents));
+    return contents;
 }

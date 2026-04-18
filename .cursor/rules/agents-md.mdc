@@ -1,0 +1,15 @@
+---
+description: Points agents and contributors to AGENTS.md for project conventions and pitfalls
+alwaysApply: true
+---
+
+# Discoverability
+
+Read **[AGENTS.md](../../AGENTS.md)** at the repository root for:
+
+- Project layout and main CMake targets
+- `guard_ptr` / OpenSSL usage (deleter type, avoid unnecessary `.get()`)
+- Protobuf fields and signed-message / certificate semantics
+- Pitfalls to avoid and agent workflow (plans, builds)
+
+Prefer following **AGENTS.md** before inventing new conventions in this repo.

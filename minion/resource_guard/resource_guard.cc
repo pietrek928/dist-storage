@@ -1,4 +1,4 @@
-#include <grpc_callback.h>
+#include <grpc/callback.h>
 
 #include <resource.pb.h>
 #include <resource.grpc.pb.h>
@@ -6,7 +6,10 @@
 
 
 class LimitHandler : public GRPCStreamHandler<
-    resource::Resource::AsyncService, resource::ResourceRequestUnion, resource::ResourceResponseUnion
+    LimitHandler,
+    resource::Resource::AsyncService,
+    resource::ResourceRequestUnion,
+    resource::ResourceResponseUnion
 > {
     GRPCCounterHandler read_count;
 
@@ -76,7 +79,7 @@ class LimitHandler : public GRPCStreamHandler<
                 finish();
                 break;
             default:
-                dispose();
+                delete this;
                 break;
         }
     }

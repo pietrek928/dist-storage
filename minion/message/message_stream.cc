@@ -6,6 +6,7 @@
 #include <grpcpp/grpcpp.h>
 
 #include <deque>
+#include <memory>
 #include <mutex>
 #include <utility>
 
@@ -14,40 +15,33 @@
 #include <peer/message.h>
 #include <peer/store.h>
 
+#include "recipient_dispatch.h"
 #include "stream_router.h"
 
-class MessageStreamHandler;
-
-class MessageStreamChannelImpl final : public MessageStreamChannel {
-    MessageStreamHandler* owner_;
-
-public:
-    explicit MessageStreamChannelImpl(MessageStreamHandler* owner) : owner_(owner) {}
-
-    bool try_enqueue(message::SignedMessage msg) override;
-};
-
 // gRPC CQ `ok` flag is passed as `running` in existing handlers; we use `running` the same way.
-class MessageStreamHandler final : public GRPCStreamHandler<
-                                     message::Message::AsyncService,
-                                     message::SignedMessage,
-                                     message::SignedMessage
-                                 > {
-    enum class ConnectPhase { kInitial, kAccepted, kStreaming };
-
+class MessageStreamHandler final : public std::enable_shared_from_this<MessageStreamHandler>,
+                                   public GRPCStreamHandler<
+                                       MessageStreamHandler,
+                                       message::Message::AsyncService,
+                                       message::SignedMessage,
+                                       message::SignedMessage>,
+                                   public MessageStreamChannel {
     enum class PendingOp { kRead, kWrite, kFinish };
 
-    ConnectPhase connect_phase_ = ConnectPhase::kInitial;
     PendingOp pending_ = PendingOp::kRead;
 
     std::shared_ptr<AuthStore> auth_store_;
     std::shared_ptr<MessageStreamRouter> router_;
-    std::shared_ptr<MessageStreamChannelImpl> channel_;
+
+    /// Keeps the handler alive until an explicit teardown (registry + CQ completion paths).
+    std::shared_ptr<MessageStreamHandler> self_ref_;
 
     std::mutex outbound_mu_;
     std::deque<message::SignedMessage> outbound_;
     bool write_pending_ = false;
     bool closing_after_writes_ = false;
+
+    bool session_active_ = false;
 
     std::string registered_peer_id_;
 
@@ -59,18 +53,43 @@ public:
     )
         : GRPCStreamHandler(async_service),
           auth_store_(std::move(auth_store)),
-          router_(std::move(router)),
-          channel_(std::make_shared<MessageStreamChannelImpl>(this)) {}
+          router_(std::move(router)) {}
 
     MessageStreamHandler(const MessageStreamHandler& other)
         : GRPCStreamHandler(other.service),
           auth_store_(other.auth_store_),
-          router_(other.router_),
-          channel_(std::make_shared<MessageStreamChannelImpl>(this)) {}
+          router_(other.router_) {}
 
-    void bind(grpc::ServerCompletionQueue* cq) {
+    void attach_shared(std::shared_ptr<MessageStreamHandler> self) { self_ref_ = std::move(self); }
+
+    void bind(grpc::ServerCompletionQueue* cq) override {
         service->RequestStream(&ctx, &stream, cq, cq, this);
     }
+
+    void on_stream_rpc_connected(grpc::ServerCompletionQueue* cq) override {
+        (void)cq;
+        session_active_ = true;
+        pending_ = PendingOp::kRead;
+        read();
+    }
+
+    void on_stream_connect_failed() override {
+        session_active_ = false;
+        unregister_if_registered();
+        self_ref_.reset();
+    }
+
+    void clone_acceptor_for_next_request(grpc::ServerCompletionQueue* cq, bool running) override {
+        if (running) {
+            auto sp = std::make_shared<MessageStreamHandler>(static_cast<const MessageStreamHandler&>(*this));
+            sp->attach_shared(sp);
+            sp->process(cq, running);
+        }
+    }
+
+    bool try_enqueue(message::SignedMessage msg) override { return enqueue_outgoing(std::move(msg)); }
+
+    bool is_valid() const override { return session_active_; }
 
     bool enqueue_outgoing(message::SignedMessage msg) {
         std::unique_lock<std::mutex> lock(outbound_mu_);
@@ -86,8 +105,8 @@ public:
     }
 
     void process(grpc::ServerCompletionQueue* cq, bool running) override {
-        if (connect_phase_ != ConnectPhase::kStreaming) {
-            handle_connect(cq, running);
+        if (stream_connect_phase_ != StreamConnectPhase::kStreaming) {
+            handle_stream_connect(cq, running);
             return;
         }
 
@@ -99,7 +118,7 @@ public:
                 handle_write_completion(running);
                 break;
             case PendingOp::kFinish:
-                dispose();
+                complete_after_stream_finish();
                 break;
         }
     }
@@ -112,23 +131,10 @@ private:
         }
     }
 
-    void handle_connect(grpc::ServerCompletionQueue* cq, bool running) {
-        if (connect_phase_ == ConnectPhase::kInitial) {
-            connect_phase_ = ConnectPhase::kAccepted;
-            bind(cq);
-            return;
-        }
-        if (connect_phase_ == ConnectPhase::kAccepted) {
-            if (!running) {
-                dispose();
-                return;
-            }
-            connect_phase_ = ConnectPhase::kStreaming;
-            (new MessageStreamHandler(*this))->process(cq, true);
-            pending_ = PendingOp::kRead;
-            read();
-            return;
-        }
+    void complete_after_stream_finish() {
+        session_active_ = false;
+        unregister_if_registered();
+        self_ref_.reset();
     }
 
     void handle_read_completion(bool ok) {
@@ -164,27 +170,26 @@ private:
             return false;
         }
 
-        router_->register_session(req.sender_id(), channel_);
+        router_->register_session(
+            req.sender_id(),
+            std::static_pointer_cast<MessageStreamChannel>(shared_from_this())
+        );
         registered_peer_id_ = req.sender_id();
 
-        const std::string& dest = data.recipient_id();
-        if (!dest.empty()) {
-            if (auth_store_->is_self(dest)) {
+        switch (dispatch_signed_message_recipient(auth_store_.get(), router_.get(), req, data)) {
+            case RecipientDispatchAction::DeliverLocal:
                 enqueue_outgoing(req);
-                return true;
-            }
-            if (router_->route_to_recipient(dest, req)) {
-                return true;
-            }
-            LOG(WARNING) << "Stream: routing failed (unknown recipient or validation)";
-            return true;
+                break;
+            case RecipientDispatchAction::Forwarded:
+                break;
+            case RecipientDispatchAction::NoRouteContinue:
+                break;
         }
-
-        enqueue_outgoing(req);
         return true;
     }
 
     void begin_shutdown_after_read_closed() {
+        session_active_ = false;
         unregister_if_registered();
         std::unique_lock<std::mutex> lock(outbound_mu_);
         outbound_.clear();
@@ -199,6 +204,7 @@ private:
     }
 
     void shutdown_with_status(grpc::Status st) {
+        session_active_ = false;
         unregister_if_registered();
         {
             std::lock_guard<std::mutex> lock(outbound_mu_);
@@ -246,16 +252,13 @@ private:
     }
 };
 
-bool MessageStreamChannelImpl::try_enqueue(message::SignedMessage msg) {
-    return owner_->enqueue_outgoing(std::move(msg));
-}
-
 void start_message_stream_acceptor(
     message::Message::AsyncService* async_service,
     grpc::ServerCompletionQueue* cq,
     std::shared_ptr<AuthStore> auth_store,
     std::shared_ptr<MessageStreamRouter> router
 ) {
-    auto* initial = new MessageStreamHandler(async_service, std::move(auth_store), std::move(router));
-    initial->process(cq, true);
+    auto sp = std::make_shared<MessageStreamHandler>(async_service, std::move(auth_store), std::move(router));
+    sp->attach_shared(sp);
+    sp->process(cq, true);
 }

@@ -8,7 +8,7 @@ class GRPCHandler {
     public:
     GRPCHandler() {}
 
-    // CAUTION: this function MUST emit event or call dispose() at the end
+    // CAUTION: this function MUST emit another CQ event or destroy the handler safely at the end.
     virtual void process(grpc::ServerCompletionQueue *cq, bool running) = 0;
     virtual ~GRPCHandler() = default;
 };
@@ -36,18 +36,19 @@ class GRPCCounterHandler : public GRPCHandler {
     }
 };
 
-class GRPCAllocableHandler : public GRPCHandler {
+template<typename T>
+void grpc_async_clone_acceptor(const T& proto, grpc::ServerCompletionQueue* cq, bool running) {
+    if (running) {
+        (new T(proto))->process(cq, running);
+    }
+}
+
+template<class Tderived, class Tservice, class Trequest, class Tresult>
+class GRPCBasicHandler : public GRPCHandler {
     protected:
     grpc::ServerContext ctx;
     int state = 0;
-    void dispose() {
-        delete this;
-    }
-};
 
-template<class Tservice, class Trequest, class Tresult, class Derived>
-class GRPCBasicHandler : public GRPCAllocableHandler {
-    protected:
     Tservice *service = NULL;
     Trequest request;
     Tresult response;
@@ -65,7 +66,7 @@ class GRPCBasicHandler : public GRPCAllocableHandler {
 
     void finish() {
         responder.Finish(response, finish_grpc_status(), this);
-        state = 12345;
+        state = 12345;  // last state value
     }
 
     public:
@@ -79,30 +80,66 @@ class GRPCBasicHandler : public GRPCAllocableHandler {
         switch(state++) {
             case 0: this->bind(cq); break;
             case 1:
-                if (running) {  // Clone for new request (must preserve derived vtable)
-                    (new Derived(static_cast<const Derived&>(*this)))->process(cq, running);
-                }
+                grpc_async_clone_acceptor(static_cast<const Tderived&>(*this), cq, running);
                 break;
             case 2:
                 handle_request();
                 finish();
                 break;
             default:
-                dispose();
+                delete this;
                 break;
         }
     }
 };
 
 
-template<class Tservice, class Trequest, class Tresult>
-class GRPCStreamHandler : public GRPCAllocableHandler {
+template<class Tderived, class Tservice, class Trequest, class Tresult>
+class GRPCStreamHandler : public GRPCHandler {
     protected:
+    grpc::ServerContext ctx;
+
+    enum class StreamConnectPhase { kInitial, kAccepted, kStreaming };
+
+    StreamConnectPhase stream_connect_phase_ = StreamConnectPhase::kInitial;
+
     // Used by RequestStream / Request*. Clone preserves this pointer (ctx/stream are fresh).
     Tservice* service = nullptr;
     Trequest request;
     Tresult response;
     grpc::ServerAsyncReaderWriter<Tresult, Trequest> stream;
+
+    virtual void bind(grpc::ServerCompletionQueue* cq) { (void)cq; }
+
+    /// After `RequestStream` completes: clone next acceptor, then start this stream (e.g. `read()`).
+    virtual void on_stream_rpc_connected(grpc::ServerCompletionQueue* cq) { (void)cq; }
+
+    /// RequestStream completion with ok=false (default: delete this).
+    virtual void on_stream_connect_failed() { delete this; }
+
+    /// Clone handler for the next incoming stream RPC (default: heap clone + process).
+    virtual void clone_acceptor_for_next_request(grpc::ServerCompletionQueue* cq, bool running) {
+        grpc_async_clone_acceptor(static_cast<const Tderived&>(*this), cq, running);
+    }
+
+    /// First completion: `bind`; second: clone + `on_stream_rpc_connected` (same completion as unary
+    /// clone + next step, but stream starts `read()` here).
+    void handle_stream_connect(grpc::ServerCompletionQueue* cq, bool running) {
+        if (stream_connect_phase_ == StreamConnectPhase::kInitial) {
+            stream_connect_phase_ = StreamConnectPhase::kAccepted;
+            bind(cq);
+            return;
+        }
+        if (stream_connect_phase_ == StreamConnectPhase::kAccepted) {
+            if (!running) {
+                on_stream_connect_failed();
+                return;
+            }
+            stream_connect_phase_ = StreamConnectPhase::kStreaming;
+            clone_acceptor_for_next_request(cq, running);
+            on_stream_rpc_connected(cq);
+        }
+    }
 
     void read() {
         stream.Read(&request, this);

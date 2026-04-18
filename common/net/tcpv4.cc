@@ -164,72 +164,31 @@ TCPv4AcceptResult tcpv4_accept_unsafe(socket_t fd, bool create_blocking) {
     return ret;
 }
 
-void fill_src_ipv4_from_socket(net::IPV4Addr* src_ipv4, const unique_fd& sock) {
+void tcpv4_addr_from_socket(net::IPV4Addr* src_ipv4, socket_t sock) {
     sockaddr_in sin{};
     socklen_t len = sizeof(sin);
-    if (getsockname(sock, reinterpret_cast<sockaddr*>(&sin), &len) != 0) {
-        throw std::runtime_error("getsockname");
-    }
+    ccall("getting socket name", getsockname(sock, reinterpret_cast<sockaddr*>(&sin), &len));
     src_ipv4->mutable_addr()->assign(reinterpret_cast<const char*>(&sin.sin_addr.s_addr), 4);
     src_ipv4->set_port(ntohs(sin.sin_port));
 }
 
-bool grpc_peer_uri_to_net_ip_addr(const std::string& peer, net::IPAddr* out) {
-    if (!out) {
-        return false;
-    }
-    static const char kIpv4Scheme[] = "ipv4:";
-    constexpr size_t scheme_len = sizeof(kIpv4Scheme) - 1;
-    if (peer.size() <= scheme_len || peer.compare(0, scheme_len, kIpv4Scheme) != 0) {
-        return false;
-    }
-    const std::string rest = peer.substr(scheme_len);
-    const size_t colon = rest.rfind(':');
-    if (colon == std::string::npos || colon == 0) {
-        return false;
-    }
-    const std::string host = rest.substr(0, colon);
-    const std::string port_str = rest.substr(colon + 1);
-    unsigned long port_ul = 0;
-    try {
-        port_ul = std::stoul(port_str);
-    } catch (...) {
-        return false;
-    }
-    if (port_ul > 65535u) {
-        return false;
-    }
-    in_addr bin{};
-    if (inet_pton(AF_INET, host.c_str(), &bin) != 1) {
-        return false;
-    }
-    net::IPV4Addr* v4 = out->mutable_ipv4();
-    v4->mutable_addr()->assign(reinterpret_cast<const char*>(&bin.s_addr), 4);
-    v4->set_port(static_cast<uint32_t>(port_ul));
-    return true;
-}
-
-namespace {
-
-const net::IPV4Addr& hole_punch_ipv4_src(const net::HolePunchParameters& settings) {
+const net::IPV4Addr& get_hole_punch_ipv4_src(const net::HolePunchParameters& settings) {
     if (settings.src().addr_case() != net::IPAddr::kIpv4) {
         throw ConnectionError("hole punch parameters require IPv4 src");
     }
     return settings.src().ipv4();
 }
 
-const net::IPV4Addr& hole_punch_ipv4_dst(const net::HolePunchParameters& settings) {
+const net::IPV4Addr& get_hole_punch_ipv4_dst(const net::HolePunchParameters& settings) {
     if (settings.dst().addr_case() != net::IPAddr::kIpv4) {
         throw ConnectionError("hole punch parameters require IPv4 dst");
     }
     return settings.dst().ipv4();
 }
 
-}  // namespace
-
 socket_t tcpv4_hole_punch(unique_fd listen_fd, const net::HolePunchParameters &settings) {
-    const net::IPV4Addr& punch_src = hole_punch_ipv4_src(settings);
-    const net::IPV4Addr& punch_dst = hole_punch_ipv4_dst(settings);
+    const net::IPV4Addr& punch_src = get_hole_punch_ipv4_src(settings);
+    const net::IPV4Addr& punch_dst = get_hole_punch_ipv4_dst(settings);
 
     // 1. Create the Listener Socket (Non-blocking: false)
     // unique_fd listen_fd = tcpv4_new_socket(false);
