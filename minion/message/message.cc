@@ -10,6 +10,8 @@
 #include <peer/store.h>
 #include <utils/poll_engine.h>
 
+#include <memory>
+
 #include "message_send.h"
 #include "message_stream.h"
 #include "stream_router.h"
@@ -41,11 +43,17 @@ int main(int argc, char** argv) {
     std::unique_ptr<grpc::ServerCompletionQueue> cq = builder.AddCompletionQueue();
     std::unique_ptr<grpc::Server> server = builder.BuildAndStart();
 
-    auto* send_initial = new MessageSendHandler(&async_service, &hole_punch_engine, auth_store);
-    send_initial->process(cq.get(), true);
+    grpc_prime_async_handler(
+        std::make_unique<MessageSendHandler>(&async_service, &hole_punch_engine, auth_store),
+        cq.get(),
+        true
+    );
 
-    auto* addr_initial = new TellMyAddrHandler(&async_service);
-    addr_initial->process(cq.get(), true);
+    grpc_prime_async_handler(
+        std::make_unique<TellMyAddrHandler>(&async_service),
+        cq.get(),
+        true
+    );
 
     start_message_stream_acceptor(&async_service, cq.get(), auth_store, stream_router);
 

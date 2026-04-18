@@ -3,6 +3,9 @@
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/support/async_stream.h>
 
+#include <atomic>
+#include <memory>
+
 
 class GRPCHandler {
     public:
@@ -36,11 +39,23 @@ class GRPCCounterHandler : public GRPCHandler {
     }
 };
 
+/// Clone the next async acceptor: heap-allocate `T` from `proto`, self-own via `arm`, then prime CQ.
 template<typename T>
 void grpc_async_clone_acceptor(const T& proto, grpc::ServerCompletionQueue* cq, bool running) {
     if (running) {
-        (new T(proto))->process(cq, running);
+        auto p = std::make_unique<T>(proto);
+        T* raw = p.get();
+        raw->arm(std::move(p));
+        raw->process(cq, running);
     }
+}
+
+/// Prime the first async handler: transfer ownership into `arm` then start the CQ state machine.
+template<class T>
+void grpc_prime_async_handler(std::unique_ptr<T> p, grpc::ServerCompletionQueue* cq, bool running) {
+    T* raw = p.get();
+    raw->arm(std::move(p));
+    raw->process(cq, running);
 }
 
 template<class Tderived, class Tservice, class Trequest, class Tresult>
@@ -53,6 +68,9 @@ class GRPCBasicHandler : public GRPCHandler {
     Trequest request;
     Tresult response;
     grpc::ServerAsyncResponseWriter<Tresult> responder;
+
+    /// Self-ownership for the handler lifetime (CQ tags use `this` until `Finish` completes).
+    std::unique_ptr<Tderived> self_;
 
     virtual void bind(grpc::ServerCompletionQueue *cq) = 0;
 
@@ -73,8 +91,10 @@ class GRPCBasicHandler : public GRPCHandler {
     GRPCBasicHandler(Tservice *service)
         : service(service), responder(&ctx) {}
     GRPCBasicHandler(const GRPCBasicHandler& other)
-    : GRPCBasicHandler(other.service) {}
+        : service(other.service), responder(&ctx) {}
     GRPCBasicHandler(GRPCBasicHandler&& other) = delete;
+
+    void arm(std::unique_ptr<Tderived> self) { self_ = std::move(self); }
 
     void process(grpc::ServerCompletionQueue *cq, bool running) {
         switch(state++) {
@@ -87,8 +107,8 @@ class GRPCBasicHandler : public GRPCHandler {
                 finish();
                 break;
             default:
-                delete this;
-                break;
+                self_.reset();
+                return;
         }
     }
 };
@@ -109,13 +129,16 @@ class GRPCStreamHandler : public GRPCHandler {
     Tresult response;
     grpc::ServerAsyncReaderWriter<Tresult, Trequest> stream;
 
+    /// Optional self-ownership when not using `shared_ptr` (see `MessageStreamHandler`).
+    std::unique_ptr<Tderived> self_;
+
     virtual void bind(grpc::ServerCompletionQueue* cq) { (void)cq; }
 
     /// After `RequestStream` completes: clone next acceptor, then start this stream (e.g. `read()`).
     virtual void on_stream_rpc_connected(grpc::ServerCompletionQueue* cq) { (void)cq; }
 
-    /// RequestStream completion with ok=false (default: delete this).
-    virtual void on_stream_connect_failed() { delete this; }
+    /// RequestStream completion with ok=false (default: release self-ownership).
+    virtual void on_stream_connect_failed() { self_.reset(); }
 
     /// Clone handler for the next incoming stream RPC (default: heap clone + process).
     virtual void clone_acceptor_for_next_request(grpc::ServerCompletionQueue* cq, bool running) {
@@ -169,4 +192,6 @@ class GRPCStreamHandler : public GRPCHandler {
     GRPCStreamHandler(const GRPCStreamHandler& other)
         : service(other.service), stream(&ctx) {}
     GRPCStreamHandler(GRPCStreamHandler&& other) = delete;
+
+    void arm(std::unique_ptr<Tderived> self) { self_ = std::move(self); }
 };

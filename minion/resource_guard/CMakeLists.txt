@@ -1,15 +1,13 @@
-add_executable(obj_store
-    obj_store.cc
-    "${CMAKE_SOURCE_DIR}/common/utils/sys/err.cc"
+add_executable(resource_guard
+    resource_guard.cc
 )
 
-# dist_storage_common: <utils/...>, <grpc/callback.h> (project tree under common/)
+# dist_storage_common: <grpc/callback.h> (project tree under common/)
 # my_proto_lib: generated *.pb.h under common/proto/cc + libprotobuf/grpc++
 # gRPC static lib pulls TLS code that needs OpenSSL symbols at link time.
 find_package(OpenSSL REQUIRED)
-target_link_libraries(obj_store PRIVATE
+target_link_libraries(resource_guard PRIVATE
     dist_storage_common
-    dist_storage_crypto
     my_proto_lib
     OpenSSL::SSL
     OpenSSL::Crypto
