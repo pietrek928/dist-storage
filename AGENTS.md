@@ -62,6 +62,7 @@ Defined in [`common/utils/guard_ptr.h`](common/utils/guard_ptr.h).
 ## gRPC & minion
 
 - Node resolver / hole punch: [`common/grpc/resolver.cc`](common/grpc/resolver.cc) — understand `auth_store` and `sign_message` before changing call signatures.
+- Async handler bases: [`common/grpc/callback.h`](common/grpc/callback.h) (`GRPCBasicHandler`, `GRPCStreamHandler`); see pitfall **Async handler self-delete** below.
 - Message service entry: [`minion/message/message.cc`](minion/message/message.cc); handlers under `message_send.cc`, `message_stream.cc`, `stream_router.cc`, `recipient_dispatch.cc`.
 
 ---
@@ -81,6 +82,7 @@ Defined in [`common/utils/guard_ptr.h`](common/utils/guard_ptr.h).
 3. **Unnecessary `.get()`** on `guard_ptr` when an implicit conversion suffices.
 4. **Certificate flow** — receiver must learn unknown senders **before** strict validation when using `sender_cert`; authority roots must be present in `AuthStore` for `push` to succeed.
 5. **Large rules in one file** — split agent instructions if this file grows unwieldy (e.g. per-subsystem notes under `minion/` or `common/peer/`).
+6. **Async handler self-delete** — do not reset the self-owning `std::unique_ptr` (e.g. `self_`) from inside `GRPCHandler::process` while `this` is still the CQ tag: that destroys `*this` before the member returns (undefined behavior). Use `grpc_defer_handler_destroy(std::unique_ptr<GRPCHandler>(self_.release()))` and call `grpc_run_deferred_handler_destroys()` after each `process` return on that thread (see [`common/grpc/callback.h`](common/grpc/callback.h)); any new CQ loop must do the same.
 
 ---
 

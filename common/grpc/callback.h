@@ -5,6 +5,7 @@
 
 #include <atomic>
 #include <memory>
+#include <vector>
 
 
 class GRPCHandler {
@@ -15,6 +16,21 @@ class GRPCHandler {
     virtual void process(grpc::ServerCompletionQueue *cq, bool running) = 0;
     virtual ~GRPCHandler() = default;
 };
+
+/// Thread-local queue of handler destroys. Any code path that calls `GRPCHandler::process` must call
+/// `grpc_run_deferred_handler_destroys()` after each return from `process` on that thread.
+inline std::vector<std::unique_ptr<GRPCHandler>>& grpc_deferred_handler_destroys_queue() {
+    thread_local std::vector<std::unique_ptr<GRPCHandler>> queue;
+    return queue;
+}
+
+inline void grpc_defer_handler_destroy(std::unique_ptr<GRPCHandler> p) {
+    grpc_deferred_handler_destroys_queue().push_back(std::move(p));
+}
+
+inline void grpc_run_deferred_handler_destroys() {
+    grpc_deferred_handler_destroys_queue().clear();
+}
 
 class GRPCCounterHandler : public GRPCHandler {
     std::atomic<int> counter = 0;
@@ -28,6 +44,7 @@ class GRPCCounterHandler : public GRPCHandler {
     virtual void process(grpc::ServerCompletionQueue *cq, bool running) {
         counter++;
         handler->process(cq, running);
+        grpc_run_deferred_handler_destroys();
     }
 
     void reset() {
@@ -47,6 +64,7 @@ void grpc_async_clone_acceptor(const T& proto, grpc::ServerCompletionQueue* cq, 
         T* raw = p.get();
         raw->arm(std::move(p));
         raw->process(cq, running);
+        grpc_run_deferred_handler_destroys();
     }
 }
 
@@ -56,6 +74,7 @@ void grpc_prime_async_handler(std::unique_ptr<T> p, grpc::ServerCompletionQueue*
     T* raw = p.get();
     raw->arm(std::move(p));
     raw->process(cq, running);
+    grpc_run_deferred_handler_destroys();
 }
 
 template<class Tderived, class Tservice, class Trequest, class Tresult>
@@ -107,7 +126,7 @@ class GRPCBasicHandler : public GRPCHandler {
                 finish();
                 break;
             default:
-                self_.reset();
+                grpc_defer_handler_destroy(std::unique_ptr<GRPCHandler>(self_.release()));
                 return;
         }
     }
@@ -138,7 +157,9 @@ class GRPCStreamHandler : public GRPCHandler {
     virtual void on_stream_rpc_connected(grpc::ServerCompletionQueue* cq) { (void)cq; }
 
     /// RequestStream completion with ok=false (default: release self-ownership).
-    virtual void on_stream_connect_failed() { self_.reset(); }
+    virtual void on_stream_connect_failed() {
+        grpc_defer_handler_destroy(std::unique_ptr<GRPCHandler>(self_.release()));
+    }
 
     /// Clone handler for the next incoming stream RPC (default: heap clone + process).
     virtual void clone_acceptor_for_next_request(grpc::ServerCompletionQueue* cq, bool running) {

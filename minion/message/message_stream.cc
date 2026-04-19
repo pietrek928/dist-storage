@@ -84,6 +84,7 @@ public:
             auto sp = std::make_shared<MessageStreamHandler>(static_cast<const MessageStreamHandler&>(*this));
             sp->attach_shared(sp);
             sp->process(cq, running);
+            grpc_run_deferred_handler_destroys();
         }
     }
 
@@ -261,4 +262,5 @@ void start_message_stream_acceptor(
     auto sp = std::make_shared<MessageStreamHandler>(async_service, std::move(auth_store), std::move(router));
     sp->attach_shared(sp);
     sp->process(cq, true);
+    grpc_run_deferred_handler_destroys();
 }

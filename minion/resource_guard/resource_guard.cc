@@ -135,7 +135,9 @@ private:
         read();
     }
 
-    void complete_after_stream_finish() { self_.reset(); }
+    void complete_after_stream_finish() {
+        grpc_defer_handler_destroy(std::unique_ptr<GRPCHandler>(self_.release()));
+    }
 };
 
 int main() {
@@ -154,6 +156,7 @@ int main() {
     bool ok = true;
     while (cq->Next(&tag, &ok)) {
         static_cast<GRPCHandler*>(tag)->process(cq.get(), ok);
+        grpc_run_deferred_handler_destroys();
     }
 
     return 0;

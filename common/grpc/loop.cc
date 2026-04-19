@@ -13,5 +13,6 @@ void grpc_loop(grpc::ServerCompletionQueue *cq) {
         }
 
         static_cast<GRPCHandler*>(tag)->process(cq, true);
+        grpc_run_deferred_handler_destroys();
     }
 }

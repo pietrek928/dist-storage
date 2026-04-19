@@ -248,6 +248,7 @@ int main() {
     bool ok = true;
     while (cq->Next(&tag, &ok)) {
         static_cast<GRPCHandler*>(tag)->process(cq.get(), ok);
+        grpc_run_deferred_handler_destroys();
     }
 
     return 0;
