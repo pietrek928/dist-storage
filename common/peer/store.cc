@@ -28,19 +28,16 @@ void AuthStore::push_authority(const std::string &authority_id, const std::strin
     ssl_call("getting public key", pubkey = X509_get_pubkey(x509));
 
     std::lock_guard<std::mutex> guard(lock);
-    root_authorities.insert_or_assign(authority_id, PeerInfo{
+    root_authorities.insert_or_assign(authority_id, AuthorityInfo{
         .last_update = timespec_timestamp(),
         .cert = cert,
-        .verifier = SSLVerifier(
-            EVP_PKEY_type(pubkey), pubkey, "sha512"
-        )
+        .pubkey = std::move(pubkey)
     });
 }
 
 void AuthStore::push(const std::string &cert) {
     X509_ptr x509;
     EVP_PKEY_ptr pubkey;
-    EVP_PKEY_ptr authority_pubkey;
 
     ssl_call("converting 509 to string", x509 = string_to_x509(cert));
     ssl_call("getting public key", pubkey = X509_get_pubkey(x509));
@@ -60,19 +57,18 @@ void AuthStore::push(const std::string &cert) {
         authority_key_id->keyid->length
     );
 
-    std::string authority_cert;
+    EVP_PKEY* authority_pubkey = nullptr;
     {
         std::lock_guard<std::mutex> guard(lock);
         auto it = root_authorities.find(authority_id);
         if (it == root_authorities.end()) {
             throw std::runtime_error("unknown authority for peer cert");
         }
-        authority_cert = it->second.cert;
+        authority_pubkey = it->second.pubkey;
     }
-
-    X509_ptr authority_x509;
-    ssl_call("converting authority cert", authority_x509 = string_to_x509(authority_cert));
-    ssl_call("getting authority public key", authority_pubkey = X509_get_pubkey(authority_x509));
+    if (!authority_pubkey) {
+        throw std::runtime_error("authority has no cached public key");
+    }
 
     int verify_res = X509_verify(x509, authority_pubkey);
     if (verify_res != 1) {
@@ -122,7 +118,7 @@ message::SignedMessage AuthStore::sign_message(
     msg.set_sender_id(self_id);
     msg.set_ttl(4);
     if (add_cert) {
-        msg.set_sender_cert(self_cert);  // TODO: not always send cert - its big
+        msg.set_sender_cert(self_cert);
     }
 
     if (!signer) {

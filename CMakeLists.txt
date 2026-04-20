@@ -35,11 +35,6 @@ FetchContent_Declare(
   gRPC
   GIT_REPOSITORY https://github.com/grpc/grpc.git
   GIT_TAG        v1.75.1
-  # gRPC v1.75.1 third_party: protobuf sets CMP0141 OLD; re2 uses cmake_minimum_required < 3.10.
-  PATCH_COMMAND
-    ${CMAKE_COMMAND}
-    -D "GRPC_PATCH_ROOT=${_grpc_src}"
-    -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/grpc_third_party_patch.cmake"
 )
 FetchContent_MakeAvailable(gRPC)
 ####################

@@ -21,11 +21,16 @@ class AuthStore {
         std::string cert;
         SSLVerifier verifier;
     } PeerInfo;
+    typedef struct AuthorityInfo {
+        timespec last_update;
+        std::string cert;
+        EVP_PKEY_ptr pubkey;
+    } AuthorityInfo;
 
     std::string self_id;
     std::string self_cert;
     std::unique_ptr<SSLSigner> signer;
-    std::map<std::string, PeerInfo> root_authorities;
+    std::map<std::string, AuthorityInfo> root_authorities;
     std::map<std::string, PeerInfo> peers;
 
     public:

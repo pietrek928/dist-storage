@@ -33,4 +33,5 @@ target_link_libraries(dist_storage_grpc PUBLIC
     absl::status
     absl::statusor
     absl::log
+    my_proto_lib
 )
