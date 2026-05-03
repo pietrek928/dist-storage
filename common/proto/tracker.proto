@@ -2,40 +2,64 @@ syntax = "proto3";
 
 package tracker;
 
+
 message NodeMetrics {
     bytes node_id = 1;
     uint64 timestamp = 2;
     map<uint32, float> values = 3;
 };
 
-enum MetricWeightMethod {
-    LINEAR = 0;
-    SQUARED = 1;
-    INVERSE = 2;
-    LOG = 3;
-    EXP = 4;
+message PolynomialMetricMethod {
+    repeated float coefficients = 1;
+};
+
+message InverseMetricMethod {
+    float add = 1;
+};
+
+message LogMetricMethod {
+    repeated float params = 1;
+};
+
+message ExpMetricMethod {
+    repeated float params = 1;
 };
 
 message MetricWeightComponent {
-    MetricWeightMethod method = 1;
-    uint32 metric_id = 2;
-    repeated float params = 3;
+    uint32 metric_id = 1;
+    oneof method {
+        PolynomialMetricMethod polynomial = 2;
+        InverseMetricMethod inverse = 3;
+        LogMetricMethod log = 4;
+        ExpMetricMethod exp = 5;
+    }
 };
 
 message ServiceMetricsMetadata {
     string service_name = 1;
     map <uint32, string> names = 2;
-    repeated MetricWeightComponent weight_components = 3;
-    uint32 tracked_nodes = 4;
+    uint32 num_nodes = 3;
 };
 
 message ServiceMetadataRequest {
     string service_name = 1;
 };
 
+message NodeEntry {
+    bytes node_id = 1;
+    uint64 timestamp = 2;
+    float weight = 3;
+};
+
+message NodesList {
+    repeated NodeEntry trackers = 2;
+    repeated NodeEntry nodes = 1;
+};
+
 message UpdateMetricsRequest {
     string service_name = 1;
     map<uint32, float> values = 2;
+    repeated NodeMetrics other_node_metrics = 3;
 };
 
 message ServiceNodesRequest {
