@@ -4,29 +4,28 @@ package data;
 
 import "google/protobuf/struct.proto";
 
-
 enum ValueType {
-    Bool = 0;
-    Int8 = 1;
-    UInt8 = 2;
-    Int16 = 3;
-    UInt16 = 4;
-    Int32 = 5;
-    UInt32 = 6;
-    Int64 = 7;
-    UInt64 = 8;
-    Float32 = 9;
-    Float64 = 10;
-    String = 11;
-    Bytes = 12;
-    Any = 13;  // means type is unspecified within context
-    JSON = 14;
+  Bool = 0;
+  Int8 = 1;
+  UInt8 = 2;
+  Int16 = 3;
+  UInt16 = 4;
+  Int32 = 5;
+  UInt32 = 6;
+  Int64 = 7;
+  UInt64 = 8;
+  Float32 = 9;
+  Float64 = 10;
+  String = 11;
+  Bytes = 12;
+  Any = 13; // means type is unspecified within context
+  JSON = 14;
 };
 
 enum SequenceType {
-    ANY = 0;
-    SINGLE = 1;
-    ARRAY = 2;
+  ANY = 0;
+  SINGLE = 1;
+  ARRAY = 2;
 };
 
 message BoolColumn { bytes data = 1; };
@@ -45,28 +44,28 @@ message BytesColumn { repeated bytes data = 1; };
 message JSONColumn { repeated google.protobuf.Struct data = 1; };
 
 message ColumnData {
-    string name = 1;
-    oneof data {
-        BoolColumn bool = 2;
-        Int8Column int8 = 3;
-        UInt8Column uint8 = 4;
-        Int16Column int16 = 5;
-        UInt16Column uint16 = 6;
-        Int32Column int32 = 7;
-        UInt32Column uint32 = 8;
-        Int64Column int64 = 9;
-        UInt64Column uint64 = 10;
-        Float32Column float32 = 11;
-        Float64Column float64 = 12;
-        StringColumn string = 13;
-        BytesColumn bytes = 14;
-        JSONColumn json = 15;
-    }
+  string name = 1;
+  oneof data {
+    BoolColumn bool = 2;
+    Int8Column int8 = 3;
+    UInt8Column uint8 = 4;
+    Int16Column int16 = 5;
+    UInt16Column uint16 = 6;
+    Int32Column int32 = 7;
+    UInt32Column uint32 = 8;
+    Int64Column int64 = 9;
+    UInt64Column uint64 = 10;
+    Float32Column float32 = 11;
+    Float64Column float64 = 12;
+    StringColumn string = 13;
+    BytesColumn bytes = 14;
+    JSONColumn json = 15;
+  }
 };
 
 message ColumnSchema {
-    string name = 1;
-    ValueType type = 2;
+  string name = 1;
+  ValueType type = 2;
 };
 
 message TableData {
@@ -75,12 +74,12 @@ message TableData {
 };
 
 message TableSchema {
-    string name = 1;
-    string id = 2;
-    repeated ColumnSchema columns = 3;
+  string name = 1;
+  string id = 2;
+  repeated ColumnSchema columns = 3;
 };
 
 message DBSchema {
-    string name = 1;
-    repeated TableSchema tables = 2;
+  string name = 1;
+  repeated TableSchema tables = 2;
 };

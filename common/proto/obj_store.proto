@@ -4,15 +4,14 @@ package obj_store;
 
 import "resource.proto";
 
-
 enum HashType {
-    SHA256 = 0;
-    SHA512 = 1;
-    SHA3_256 = 2;
-    SHA3_512 = 3;
+  SHA256 = 0;
+  SHA512 = 1;
+  SHA3_256 = 2;
+  SHA3_512 = 3;
 };
 
-service ObjStore{
+service ObjStore {
   rpc Write(WriteRequest) returns (Result);
   rpc Read(ReadRequest) returns (ContentResult);
   rpc Hash(HashRequest) returns (ContentResult);
@@ -23,7 +22,7 @@ message WriteRequest {
   resource.TaskHeader hdr = 1;
   bytes id = 2;
   repeated string paths = 3; // required when creating file
-  int64 offset = 4;  // -1 = end of file
+  int64 offset = 4;          // -1 = end of file
   bytes data = 5;
 };
 
@@ -38,7 +37,7 @@ message HashRequest {
   resource.TaskHeader hdr = 1;
   bytes id = 2;
   HashType hash_type = 3;
-  int64 offset = 4; // -1 = end of file
+  int64 offset = 4;   // -1 = end of file
   int64 data_len = 5; // default = to file end
 };
 

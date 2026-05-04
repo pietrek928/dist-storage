@@ -2,73 +2,72 @@ syntax = "proto3";
 
 package query;
 
-
 enum ColumnOperation {
-    CONST = 0;
-    ADD = 1;
-    SUB = 2;
-    MUL = 3;
-    DIV = 4;
-    NEG = 5;  // -x
-    INV = 6;  // 1/x
-    ABS = 7;  // |x|
-    SQRT = 8;
-    EXP = 9;
-    POW = 10;
-    LN = 11;
-    LOG = 12;
+  CONST = 0;
+  ADD = 1;
+  SUB = 2;
+  MUL = 3;
+  DIV = 4;
+  NEG = 5; // -x
+  INV = 6; // 1/x
+  ABS = 7; // |x|
+  SQRT = 8;
+  EXP = 9;
+  POW = 10;
+  LN = 11;
+  LOG = 12;
 
-    NOT = 30;
-    AND = 31;
-    OR = 32;
-    XOR = 35;
-    NAND = 33;
-    NOR = 34;
-    XNOR = 36;
+  NOT = 30;
+  AND = 31;
+  OR = 32;
+  XOR = 35;
+  NAND = 33;
+  NOR = 34;
+  XNOR = 36;
 
-    EQ = 50;
-    NEQ = 51;
-    GT = 52;
-    LT = 53;
-    GTE = 54;
-    LTE = 55;
-    IN = 56;
-    NOT_IN = 57;
-    LIKE = 58;
-    NOT_LIKE = 59;
-    ILIKE = 60;
-    NOT_ILIKE = 61;
-    IS_NULL = 62;
-    IS_NOT_NULL = 63;
+  EQ = 50;
+  NEQ = 51;
+  GT = 52;
+  LT = 53;
+  GTE = 54;
+  LTE = 55;
+  IN = 56;
+  NOT_IN = 57;
+  LIKE = 58;
+  NOT_LIKE = 59;
+  ILIKE = 60;
+  NOT_ILIKE = 61;
+  IS_NULL = 62;
+  IS_NOT_NULL = 63;
 
-    NULL_ = 90;
-    TRUE = 91;
-    FALSE = 92;
+  NULL_ = 90;
+  TRUE = 91;
+  FALSE = 92;
 
-    MIN = 104;
-    MAX = 105;
-    SUM = 106;
-    COUNT = 107;
-    COUNT_DISTINCT = 108;
-    AVG = 109;
-    MEDIAN = 110;
-    STD = 111;
-    VAR = 112;
+  MIN = 104;
+  MAX = 105;
+  SUM = 106;
+  COUNT = 107;
+  COUNT_DISTINCT = 108;
+  AVG = 109;
+  MEDIAN = 110;
+  STD = 111;
+  VAR = 112;
 
-    COLUMN = 250;
-    DESC = 251;
+  COLUMN = 250;
+  DESC = 251;
 
-    TABLE = 261;
-    DF = 262;
-    FILTER = 263;
-    RANGE = 264;
-    GROUP = 265;
-    SORT = 266;
-    UNION = 267;
+  TABLE = 261;
+  DF = 262;
+  FILTER = 263;
+  RANGE = 264;
+  GROUP = 265;
+  SORT = 266;
+  UNION = 267;
 
-    // TODO: Low level processing ops
+  // TODO: Low level processing ops
 
-    NOP = 400;
+  NOP = 400;
 
-    INVALID = 500;
+  INVALID = 500;
 };

@@ -6,7 +6,6 @@ import "google/protobuf/empty.proto";
 import "net.proto";
 import "minion.proto";
 
-
 // Payload nested inside SignedMessage.data (see SignedMessage).
 message MessageData {
   bytes recipient_id = 1;
@@ -15,8 +14,9 @@ message MessageData {
     net.HolePunchParameters hole_punch = 3;
     net.IPAddr listen = 4;
   };
-  // True when the sender already had the recipient peer id in its local trust store when signing.
-  // False on first contact: include sender_cert on outbound signed messages so the peer can cache the sender.
+  // True when the sender already had the recipient peer id in its local trust
+  // store when signing. False on first contact: include sender_cert on outbound
+  // signed messages so the peer can cache the sender.
   bool has_recipient_cert = 5;
 };
 
@@ -30,9 +30,11 @@ enum SendMessageStatus {
 message SignedMessage {
   bytes sender_id = 1;
   bytes signature = 2;
-  // Optional DER leaf cert matching sender_id. Sent when the peer is not yet in the recipient's trust store.
+  // Optional DER leaf cert matching sender_id. Sent when the peer is not yet in
+  // the recipient's trust store.
   bytes sender_cert = 3;
-  // Signed payload bytes (MessageData). The signature covers this field only, not sender_cert.
+  // Signed payload bytes (MessageData). The signature covers this field only,
+  // not sender_cert.
   bytes data = 4;
   int32 ttl = 5;
 };
