@@ -25,3 +25,34 @@ message CheckSessionResult {
   CheckSessionStatus status = 1;
   repeated resource.KeySet auths = 2;
 };
+
+message AccessGrant {
+  int64 start_timestamp_s = 1;
+  int64 end_timestamp_s = 2;
+  repeated string resourceKeys = 3;
+  map<string, string> roleMappings = 4;
+};
+
+message LimitEntry {
+  string key = 1;
+  repeated string resourceKeyPrefixes = 2;
+  int64 start_timestamp_s = 3;
+  int64 end_timestamp_s = 4;
+  float accum_thresh = 5;
+  float accum_alpha = 6;
+  float billing_limit = 7;
+  float billing_window_s = 8;
+};
+
+message RoleMapping {
+  int64 start_timestamp_s = 1;
+  int64 end_timestamp_s = 2;
+  string grantType = 3;
+  string role = 4;
+};
+
+message ResourceGrant {
+  repeated AccessGrant grants = 1;
+  repeated LimitEntry limits = 2;
+  repeated RoleMapping roleMappings = 3;
+};

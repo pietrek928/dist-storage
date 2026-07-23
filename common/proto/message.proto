@@ -13,6 +13,7 @@ message MessageData {
     minion.Register minion_register = 2;
     net.HolePunchParameters hole_punch = 3;
     net.IPAddr listen = 4;
+    auth.ResourceGrant resource_grant = 5;
   };
   // True when the sender already had the recipient peer id in its local trust
   // store when signing. False on first contact: include sender_cert on outbound
