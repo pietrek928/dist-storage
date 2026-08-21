@@ -12,10 +12,6 @@ enum CheckSessionStatus {
   FAILED = 3;
 };
 
-service Auth {
-  rpc CheckSession(CheckSessionRequest) returns (CheckSessionResult);
-};
-
 message CheckSessionRequest {
   resource.TaskHeader hdr = 1;
   bytes sessionId = 2;
@@ -26,33 +22,39 @@ message CheckSessionResult {
   repeated resource.KeySet auths = 2;
 };
 
+service Auth {
+  rpc CheckSession(CheckSessionRequest) returns (CheckSessionResult);
+};
+
 message AccessGrant {
-  int64 start_timestamp_s = 1;
-  int64 end_timestamp_s = 2;
-  repeated string resourceKeys = 3;
-  map<string, string> roleMappings = 4;
+  int64 startTimestamp_s = 1;
+  int64 endTimestamp_s = 2;
+  repeated string roles = 3;
+  repeated string resourceKeyPrefixes = 4;
+};
+
+message RoleMapping {
+  int64 startTimestamp_s = 1;
+  int64 endTimestamp_s = 2;
+  string grantTo = 3;
+  string roles = 4;
 };
 
 message LimitEntry {
   string key = 1;
   repeated string resourceKeyPrefixes = 2;
-  int64 start_timestamp_s = 3;
-  int64 end_timestamp_s = 4;
-  float accum_thresh = 5;
-  float accum_alpha = 6;
-  float billing_limit = 7;
-  float billing_window_s = 8;
-};
-
-message RoleMapping {
-  int64 start_timestamp_s = 1;
-  int64 end_timestamp_s = 2;
-  string grantType = 3;
-  string role = 4;
+  int64 startTimestamp_s = 3;
+  int64 endTimestamp_s = 4;
+  float accumThresh = 5;
+  float accumAlpha = 6;
+  float billingLimit = 7;
+  float billingWindow_s = 8;
 };
 
 message ResourceGrant {
   repeated AccessGrant grants = 1;
-  repeated LimitEntry limits = 2;
-  repeated RoleMapping roleMappings = 3;
+  repeated RoleMapping roleMappings = 2;
+  repeated LimitEntry limits = 3;
 };
+
+// TODO: signed session, roles ? resource key prefixes ?

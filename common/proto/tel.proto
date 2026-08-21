@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package tel;
+
+enum OperationResult {
+  OK = 0;
+  FAILED = 1;
+  CANCELLED = 2;
+  TIMEOUT = 3;
+  OVERLOAD = 4;
+};

@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package tracker;
 
+import "google/protobuf/empty.proto";
+
 message PolynomialMetricMethod { repeated float coefficients = 1; };
 
 message InverseMetricMethod { float add = 1; };

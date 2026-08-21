@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package bill_holder;
+
+import "tel.proto";
+
+message BillEvent {
+    bytes eventId = 1;
+    bytes billerId = 2;
+    int64 timestamp_s = 3;
+    string billingKey = 4;
+    double amount = 5;
+};
+
+message BillAppendRequest {
+    repeated BillEvent events = 1;
+};
+
+message BillAppendResult {
+    tel.OperationResult result = 1;
+};
+
+message BillGetRequest {
+    int64 startTimestamp_s = 1;
+    int64 endTimestamp_s = 2;
+    uint32 limit = 3;
+};
+
+message BillGetResponse {
+    repeated BillEvent events = 1;
+};
+
+message BillFlushRequest {
+    int64 startTimestamp_s = 1;
+    int64 endTimestamp_s = 2;
+};
+
+message BillFlushResponse {
+    tel.OperationResult result = 1;
+    int64 count = 2;
+};
+
+service BillHolder {
+    rpc AppendBill(BillAppendRequest) returns (BillAppendResult);
+    rpc GetBills(BillGetRequest) returns (BillGetResponse);
+    rpc FlushBills(BillFlushRequest) returns (BillFlushResponse);
+};

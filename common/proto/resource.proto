@@ -2,13 +2,7 @@ syntax = "proto3";
 
 package resource;
 
-enum OperationResult {
-  OK = 0;
-  FAILED = 1;
-  CANCELLED = 2;
-  TIMEOUT = 3;
-  OVERLOAD = 4;
-};
+import "tel.proto";
 
 message KeySet { repeated string keys = 1; };
 
@@ -29,7 +23,7 @@ message SessionData {
   int64 end_timestamp_s = 3;
 };
 
-message ResourceRequestResult { OperationResult result = 1; };
+message ResourceRequestResult { tel.OperationResult result = 1; };
 
 service Resource {
   rpc ResourceSession(stream ResourceRequestUnion)
@@ -56,4 +50,4 @@ message BillAppend { map<string, double> billItems = 1; };
 message BillOverride { map<string, double> billItems = 1; };
 
 // send ResourceFinish to confirm billing operation finish
-message ResourceFinish { OperationResult result = 1; };
+message ResourceFinish { tel.OperationResult result = 1; };

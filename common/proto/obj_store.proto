@@ -3,6 +3,7 @@ syntax = "proto3";
 package obj_store;
 
 import "resource.proto";
+import "tel.proto";
 
 enum HashType {
   SHA256 = 0;
@@ -46,9 +47,9 @@ message DeleteRequest {
   bytes id = 2;
 };
 
-message Result { resource.OperationResult result = 1; };
+message Result { tel.OperationResult result = 1; };
 
 message ContentResult {
-  resource.OperationResult result = 1;
+  tel.OperationResult result = 1;
   bytes content = 2;
 };
