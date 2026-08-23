@@ -2,25 +2,34 @@
 set(CC_OUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cc")
 set(PY_OUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/py")
 
-# 2. Find all .proto files
-file(GLOB PROTO_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.proto")
+# 1. Define Output Directories
+set(CC_OUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cc")
+set(PY_OUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/py")
+
+# 2. Find all .proto files (Use GLOB_RECURSE for subdirectories)
+file(GLOB_RECURSE PROTO_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.proto")
 
 # ---------------------------------------------------------
-# NEW: 2.5 Predict the generated C++ filenames
+# 2.5 Predict the generated C++ filenames accurately
 # ---------------------------------------------------------
 set(PROTO_CC_SRCS "")
 set(PROTO_CC_HDRS "")
 foreach(FIL ${PROTO_FILES})
-    # Extract just the filename without the extension (e.g., "message" from "message.proto")
-    get_filename_component(FIL_WE ${FIL} NAME_WE)
+    # Get the file path relative to the proto_path (CMAKE_CURRENT_SOURCE_DIR)
+    # e.g., "subdir/message.proto"
+    file(RELATIVE_PATH REL_FIL "${CMAKE_CURRENT_SOURCE_DIR}" "${FIL}")
 
-    # Predict the Protobuf files
-    list(APPEND PROTO_CC_SRCS "${CC_OUT_DIR}/${FIL_WE}.pb.cc")
-    list(APPEND PROTO_CC_HDRS "${CC_OUT_DIR}/${FIL_WE}.pb.h")
+    # Strip the .proto extension, keeping the subdirectory
+    # e.g., "subdir/message.proto" -> "subdir/message"
+    string(REGEX REPLACE "\\.proto$" "" REL_FIL_WE "${REL_FIL}")
 
-    # Predict the gRPC files
-    list(APPEND PROTO_CC_SRCS "${CC_OUT_DIR}/${FIL_WE}.grpc.pb.cc")
-    list(APPEND PROTO_CC_HDRS "${CC_OUT_DIR}/${FIL_WE}.grpc.pb.h")
+    # Predict the Protobuf files with subdirectories intact
+    list(APPEND PROTO_CC_SRCS "${CC_OUT_DIR}/${REL_FIL_WE}.pb.cc")
+    list(APPEND PROTO_CC_HDRS "${CC_OUT_DIR}/${REL_FIL_WE}.pb.h")
+
+    # Predict the gRPC files with subdirectories intact
+    list(APPEND PROTO_CC_SRCS "${CC_OUT_DIR}/${REL_FIL_WE}.grpc.pb.cc")
+    list(APPEND PROTO_CC_HDRS "${CC_OUT_DIR}/${REL_FIL_WE}.grpc.pb.h")
 endforeach()
 
 # 3. Locate plugins

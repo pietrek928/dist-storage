@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package bill_holder;
+package holder.bill;
 
 import "tel.proto";
 
@@ -12,36 +12,36 @@ message BillEvent {
     double amount = 5;
 };
 
-message BillAppendRequest {
+message AppendRequest {
     repeated BillEvent events = 1;
 };
 
-message BillAppendResult {
+message AppendResult {
     tel.OperationResult result = 1;
 };
 
-message BillGetRequest {
+message GetRequest {
     int64 startTimestamp_s = 1;
     int64 endTimestamp_s = 2;
     uint32 limit = 3;
 };
 
-message BillGetResponse {
+message GetResponse {
     repeated BillEvent events = 1;
 };
 
-message BillFlushRequest {
+message FlushRequest {
     int64 startTimestamp_s = 1;
     int64 endTimestamp_s = 2;
 };
 
-message BillFlushResponse {
+message FlushResponse {
     tel.OperationResult result = 1;
     int64 count = 2;
 };
 
-service BillHolder {
-    rpc AppendBill(BillAppendRequest) returns (BillAppendResult);
-    rpc GetBills(BillGetRequest) returns (BillGetResponse);
-    rpc FlushBills(BillFlushRequest) returns (BillFlushResponse);
+service Bill {
+    rpc Append(AppendRequest) returns (AppendResult);
+    rpc Get(GetRequest) returns (GetResponse);
+    rpc Flush(FlushRequest) returns (FlushResponse);
 };

@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package obj_store;
+package holder.obj;
 
 import "resource.proto";
 import "tel.proto";
@@ -12,7 +12,7 @@ enum HashType {
   SHA3_512 = 3;
 };
 
-service ObjStore {
+service Obj {
   rpc Write(WriteRequest) returns (Result);
   rpc Read(ReadRequest) returns (ContentResult);
   rpc Hash(HashRequest) returns (ContentResult);

@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package holder.limit;
+
+import "tel.proto";
+
+message LimitEvent {
+    string limitKey = 1;
+    double limitValue = 2;
+    int64 timestamp_s = 3;
+};
+
+message AppendRequest {
+    repeated LimitEvent events = 1;
+};
+
+message AppendResult {
+    tel.OperationResult result = 1;
+};
+
+message GetRequest {
+    repeated string limitKeys = 1;
+};
+
+message GetResponse {
+    repeated double limitValues = 1;
+};
+
+message ResetRequest {
+    repeated string limitKeys = 1;
+    int64 timestamp_s = 2;
+};
+
+message ResetResult {
+    tel.OperationResult result = 1;
+};
+
+service Limit {
+    rpc Append(AppendRequest) returns (AppendResult);
+    rpc Get(GetRequest) returns (GetResponse);
+    rpc Reset(ResetRequest) returns (ResetResult);
+};
