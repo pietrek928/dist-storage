@@ -16,18 +16,15 @@ service Limit {
 };
 
 message LimitReserve {
-  bytes billingId = 1;
-  map<string, double> billItems = 2;
+  map<string, double> keyPrefixes = 1;
 }
 
 message LimitReserveResponse {
   LimitResult result = 1;
-  bytes transactionId = 2;
 }
 
 message LimitCommit {
-  bytes id = 1; // transaction or billing id
-  map<string, double> billItems = 2;
+  map<string, double> keyPrefixes = 1;
 }
 
 message LimitCommitResponse { LimitResult result = 1; };

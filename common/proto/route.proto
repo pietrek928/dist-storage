@@ -4,20 +4,19 @@ package minion;
 
 
 message RouteHash {
-  // order: [minionIds, subrouteIds]
-  // hashN = len(minionIds) + len(subrouteIds)
-  repeated bytes minionIds = 1;
-  repeated bytes subrouteIds = 2;
+  bytes id = 1;
+  repeated bytes targetIds = 2;
   repeated uint32 hashRanges = 3;
-  repeated uint32 hashSeeds = 4;
+  uint32 hashSize = 4;
   repeated string properties = 5;
-  float distanceScore = 6; // if not present - exact hash match
+  uint32 seed = 6;
+
+  // float distanceScore = 9; // how hard weight hash distances when routing new resources ; default = 0.0
+  // TODO: better distance computation - universal by properties ?
 };
 
 message RouteScore {
-  // order: [minionIds, subrouteIds]
-  // scorseN = len(minionIds) + len(subrouteIds)
-  repeated bytes minionIds = 1;
-  repeated bytes subrouteIds = 2;
+  bytes id = 1;
+  repeated bytes targetIds = 2;
   repeated float scores = 3;
 };

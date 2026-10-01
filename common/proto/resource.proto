@@ -11,12 +11,6 @@ message ResourceKeys {
   repeated KeySet keys_or = 2;
 };
 
-message TaskHeader {
-  bytes signerId = 1;
-  bytes signature = 2;
-  bytes sessionData = 3;
-};
-
 message SessionData {
   repeated KeySet permissions = 1;
   repeated bytes billingIds = 2;
@@ -41,9 +35,8 @@ message ResourceRequestUnion {
 
 // Inits billing and returns auth paths - also confirms auth
 message ResourceRequest {
-  TaskHeader hdr = 1;
-  repeated bytes billingIds = 2;
-  map<string, double> billItems = 3;
+  repeated bytes billingIds = 1;
+  map<string, double> billItems = 2;
 };
 
 message BillAppend { map<string, double> billItems = 1; };

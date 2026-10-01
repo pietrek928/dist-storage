@@ -20,31 +20,27 @@ service Obj {
 };
 
 message WriteRequest {
-  resource.TaskHeader hdr = 1;
-  bytes id = 2;
-  repeated string paths = 3; // required when creating file
-  int64 offset = 4;          // -1 = end of file
-  bytes data = 5;
+  bytes id = 1;
+  repeated string paths = 2; // required when creating file
+  int64 offset = 3;          // -1 = end of file
+  bytes data = 4;
 };
 
 message ReadRequest {
-  resource.TaskHeader hdr = 1;
-  bytes id = 2;
-  int64 offset = 3; // -1 = end of file
-  int64 data_len = 4;
+  bytes id = 1;
+  int64 offset = 2; // -1 = end of file
+  int64 data_len = 3;
 };
 
 message HashRequest {
-  resource.TaskHeader hdr = 1;
-  bytes id = 2;
-  HashType hash_type = 3;
-  int64 offset = 4;   // -1 = end of file
-  int64 data_len = 5; // default = to file end
+  bytes id = 1;
+  HashType hash_type = 2;
+  int64 offset = 3;   // -1 = end of file
+  int64 data_len = 4; // default = to file end
 };
 
 message DeleteRequest {
-  resource.TaskHeader hdr = 1;
-  bytes id = 2;
+  bytes id = 1;
 };
 
 message Result { tel.OperationResult result = 1; };

@@ -13,8 +13,7 @@ enum CheckSessionStatus {
 };
 
 message CheckSessionRequest {
-  resource.TaskHeader hdr = 1;
-  bytes sessionId = 2;
+  bytes sessionId = 1;
 };
 
 message CheckSessionResult {
@@ -57,4 +56,14 @@ message ResourceGrant {
   repeated LimitEntry limits = 3;
 };
 
-// TODO: signed session, roles ? resource key prefixes ?
+message SessionRequest {
+  bytes pubKey = 1;
+  repeated string roles = 2;
+  repeated string resourceKeyPrefixes = 3;
+};
+
+message SessionResult {
+  CheckSessionStatus status = 1;
+  bytes sessionId = 2;
+  bytes sessionCert = 3;
+};

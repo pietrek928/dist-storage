@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package holder.resource_event;
+
+import "tel.proto";
+
+
+message ResourceEventFilter {
+    repeated string resourceKeyPrefixes = 1;
+    int64 startTimestamp_s = 2;
+    int64 endTimestamp_s = 3;
+    repeated bytes billerIds = 4;
+    repeated bytes limitIds = 5;
+};
+
+message ResourceEvent {
+  bytes eventId = 1;
+  string resourceKey = 2;
+  int64 timestamp_s = 3;
+  double amount = 4;
+  repeated bytes billerIds = 5;
+  repeated bytes limitIds = 6;
+};
+
+message AppendRequest { repeated ResourceEvent events = 1; };
+
+message AppendResult { tel.OperationResult result = 1; };
+
+message GetRequest {
+  ResourceEventFilter filter = 1;
+  int64 limit = 2;
+};
+
+message GetResponse { repeated ResourceEvent events = 1; };
+
+message FlushResponse {
+  tel.OperationResult result = 1;
+  int64 count = 2;
+};
+
+service Bill {
+  rpc Append(AppendRequest) returns (AppendResult);
+  rpc Get(GetRequest) returns (GetResponse);
+  rpc Flush(ResourceEventFilter) returns (FlushResponse);
+};

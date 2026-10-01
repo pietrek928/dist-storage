@@ -6,10 +6,9 @@ import "tel.proto";
 
 message BillEvent {
     bytes eventId = 1;
-    bytes billerId = 2;
-    int64 timestamp_s = 3;
-    string billingKey = 4;
-    double amount = 5;
+    bytes billinId = 2;
+    double amount = 3;
+    int64 timestamp_s = 4;
 };
 
 message AppendRequest {
@@ -18,26 +17,24 @@ message AppendRequest {
 
 message AppendResult {
     tel.OperationResult result = 1;
+    GetResponse value = 2;
 };
 
 message GetRequest {
-    int64 startTimestamp_s = 1;
-    int64 endTimestamp_s = 2;
-    uint32 limit = 3;
+    bytes billingId = 1;
+    int64 timestamp_s = 2;
 };
 
 message GetResponse {
-    repeated BillEvent events = 1;
+    double amount = 1;
 };
 
 message FlushRequest {
-    int64 startTimestamp_s = 1;
-    int64 endTimestamp_s = 2;
+    int64 timestamp_s = 1;
 };
 
 message FlushResponse {
     tel.OperationResult result = 1;
-    int64 count = 2;
 };
 
 service Bill {
