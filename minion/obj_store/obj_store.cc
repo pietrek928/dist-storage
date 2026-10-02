@@ -1,5 +1,6 @@
 #include <utils/unique_fd.h>
 #include <grpc/callback.h>
+#include <grpc/loop.h>
 #include <crypto/sgn.h>
 
 #include <algorithm>
@@ -244,12 +245,7 @@ int main() {
     grpc_prime_async_handler(std::make_unique<DeleteHandler>(&service), cq.get(), true);
     grpc_prime_async_handler(std::make_unique<HashHandler>(&service), cq.get(), true);
 
-    void* tag = nullptr;
-    bool ok = true;
-    while (cq->Next(&tag, &ok)) {
-        static_cast<GRPCHandler*>(tag)->process(cq.get(), ok);
-        grpc_run_deferred_handler_destroys();
-    }
+    grpc_loop(cq.get());
 
     return 0;
 }

@@ -4,7 +4,9 @@
 #include <grpc/event_engine/endpoint_config.h>
 
 #include <absl/log/log.h>
+#include <openssl/bio.h>
 
+#include <crypto/auth.h>
 #include <net/tcpv4.h>
 
 #include "resolver.h"
@@ -37,9 +39,10 @@ static void PerformHolePunchAndHandshake(
         tcpv4_set_timeout(connected_fd, 5.0f);
 
         SSL_ptr ssl = SSL_new(ssl_ctx);
-        SSL_set_fd(ssl, connected_fd.handle());
+        BIO_ptr bio(BIO_new_socket(connected_fd, BIO_NOCLOSE));
+        BIO* bio_raw = bio.handle();
+        SSL_set_bio(ssl, bio_raw, bio_raw);
 
-        // --- THE MAGIC TOGGLE ---
         int ret;
         if (is_client) {
             SSL_set_connect_state(ssl);

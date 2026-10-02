@@ -119,8 +119,12 @@ class GRPCBasicHandler : public GRPCHandler {
         switch(state++) {
             case 0: this->bind(cq); break;
             case 1:
+                if (!running) {
+                    grpc_defer_handler_destroy(std::unique_ptr<GRPCHandler>(self_.release()));
+                    return;
+                }
                 grpc_async_clone_acceptor(static_cast<const Tderived&>(*this), cq, running);
-                break;
+                [[fallthrough]];
             case 2:
                 handle_request();
                 finish();

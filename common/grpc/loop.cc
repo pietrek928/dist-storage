@@ -5,14 +5,9 @@
 
 void grpc_loop(grpc::ServerCompletionQueue *cq) {
     void* tag;
-    bool ok;  // TODO: stop condition
+    bool ok = true;
     while (cq->Next(&tag, &ok)) {
-        if (!ok) {
-            // std::cout << "RPC failed" << std::endl;
-            continue;
-        }
-
-        static_cast<GRPCHandler*>(tag)->process(cq, true);
+        static_cast<GRPCHandler*>(tag)->process(cq, ok);
         grpc_run_deferred_handler_destroys();
     }
 }

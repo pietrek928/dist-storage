@@ -43,6 +43,7 @@ public:
         return valid();
     }
 
+    /// Passes ownership to the caller and leaves this fd empty (does not close).
     socket_t handle() {
         auto r = fd;
         fd = -1;

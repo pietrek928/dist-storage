@@ -50,6 +50,7 @@ class guard_ptr {
         return ptr;
     }
 
+    /// Passes ownership to the caller and leaves this guard empty (does not free).
     Tobj *handle() {
         auto r = ptr;
         ptr = NULL;

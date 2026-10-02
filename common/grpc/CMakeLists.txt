@@ -2,7 +2,9 @@ set(DIST_STORAGE_GRPC_SRCS
     addr.cc
     ssl_endpoint.cc
     resolver.cc
+    resolver_factory.cc
     engine.cc
+    loop.cc
     ../net/tcpv4.cc
     ../utils/sys/err.cc
     ../utils/sys/call_check.cc
@@ -29,9 +31,12 @@ target_include_directories(dist_storage_grpc PUBLIC
 )
 
 target_link_libraries(dist_storage_grpc PUBLIC
+    dist_storage_peer
     grpc++
     absl::status
     absl::statusor
     absl::log
     my_proto_lib
 )
+
+add_subdirectory(tests)

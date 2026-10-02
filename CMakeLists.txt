@@ -39,14 +39,24 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(gRPC)
 ####################
 
+FetchContent_Declare(
+  googletest
+  GIT_REPOSITORY https://github.com/google/googletest.git
+  GIT_TAG        v1.15.2
+)
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+
+enable_testing()
+include(GoogleTest)
 
 add_subdirectory(common/crypto)
 add_subdirectory(common/proto)
 include_directories(${CMAKE_SOURCE_DIR}/common)
 include_directories(${CMAKE_SOURCE_DIR}/common/proto/cc)
 
-add_subdirectory(common/grpc)
 add_subdirectory(common/peer)
+add_subdirectory(common/grpc)
 add_subdirectory(minion/obj_store)
 add_subdirectory(minion/resource_guard)
 add_subdirectory(minion/message)

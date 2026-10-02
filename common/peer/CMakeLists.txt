@@ -15,5 +15,6 @@ target_include_directories(dist_storage_peer PUBLIC
 
 target_link_libraries(dist_storage_peer PUBLIC
     dist_storage_crypto
+    my_proto_lib
     grpc++
 )

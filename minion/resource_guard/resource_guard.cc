@@ -1,4 +1,5 @@
 #include <grpc/callback.h>
+#include <grpc/loop.h>
 
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/server_builder.h>
@@ -152,12 +153,7 @@ int main() {
 
     grpc_prime_async_handler(std::make_unique<LimitHandler>(&async_service), cq.get(), true);
 
-    void* tag = nullptr;
-    bool ok = true;
-    while (cq->Next(&tag, &ok)) {
-        static_cast<GRPCHandler*>(tag)->process(cq.get(), ok);
-        grpc_run_deferred_handler_destroys();
-    }
+    grpc_loop(cq.get());
 
     return 0;
 }

@@ -1,5 +1,6 @@
 #include <grpc/callback.h>
 #include <grpc/engine.h>
+#include <grpc/loop.h>
 
 #include <absl/log/log.h>
 #include <grpcpp/grpcpp.h>
@@ -57,12 +58,7 @@ int main(int argc, char** argv) {
 
     start_message_stream_acceptor(&async_service, cq.get(), auth_store, stream_router);
 
-    void* tag;
-    bool ok = true;
-    while (cq->Next(&tag, &ok)) {
-        static_cast<GRPCHandler*>(tag)->process(cq.get(), ok);
-        grpc_run_deferred_handler_destroys();
-    }
+    grpc_loop(cq.get());
 
     return 0;
 }

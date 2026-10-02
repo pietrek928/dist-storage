@@ -1,6 +1,7 @@
 #include "poll_engine.h"
 #include "sys/call_check.h"
 
+#include <utility>
 #include <vector>
 #include <unistd.h>
 #include <sys/eventfd.h>
@@ -64,39 +65,55 @@ void PollEngine::push(int fd, Tcallback callback, bool read, bool write) {
 }
 
 void PollEngine::poll(int timeout_ms) {
-    epoll_event events[event_batch_size];  // TODO: check err
+    epoll_event events[event_batch_size];
     int nfds;
     sys_call("Polling epoll", nfds = epoll_wait(epoll_fd_, events, event_batch_size, timeout_ms));
 
-    std::vector<Tcallback> callbacks;
+    std::vector<std::pair<int, Tcallback>> callbacks;
 
     if (nfds) {
         std::lock_guard<std::mutex> lock(map_mutex_);
 
         if (nfds < event_batch_size) {
-            clear_wake();  // events batch limit reached - check again later for more events
+            clear_wake();
         }
         for (int i = 0; i < nfds; i++) {
-            auto its = watchers_.equal_range(events[i].data.fd);
+            const int fd = events[i].data.fd;
+            auto its = watchers_.equal_range(fd);
             auto flags = events[i].events;
             for (auto it = its.first; it != its.second;) {
                 if (flags & it->second.first) {
-                    callbacks.emplace_back(std::move(it->second.second));
+                    callbacks.emplace_back(fd, std::move(it->second.second));
                     watchers_.erase(it++);
                 } else {
                     ++it;
                 }
             }
         }
+
+        for (const auto& item : callbacks) {
+            ++in_flight_[item.first];
+        }
     }
 
-    for (auto &callback : callbacks) {
-        callback();
+    for (auto& item : callbacks) {
+        item.second();
+        {
+            std::lock_guard<std::mutex> lock(map_mutex_);
+            auto it = in_flight_.find(item.first);
+            if (it != in_flight_.end() && --(it->second) == 0) {
+                in_flight_.erase(it);
+            }
+            in_flight_cv_.notify_all();
+        }
     }
 }
 
 void PollEngine::pop(int fd) {
-    std::lock_guard<std::mutex> lock(map_mutex_);
+    std::unique_lock<std::mutex> lock(map_mutex_);
     auto its = watchers_.equal_range(fd);
     watchers_.erase(its.first, its.second);
+    in_flight_cv_.wait(lock, [&]() {
+        return in_flight_.find(fd) == in_flight_.end();
+    });
 }

@@ -7,15 +7,13 @@
 #include <grpc/event_engine/slice_buffer.h>
 
 #include <utils/unique_fd.h>
-#include <utils/guard_ptr.h>
 #include <utils/poll_engine.h>
 #include <crypto/ssl.h>
 
 
 namespace grpc_exp = grpc_event_engine::experimental;
 
-class SSLEndpoint : public grpc_exp::EventEngine::Endpoint,
-                    public std::enable_shared_from_this<SSLEndpoint> {
+class SSLEndpoint : public grpc_exp::EventEngine::Endpoint {
 
     // 16KB is a standard TLS record size
     constexpr static int kSslReadBufferSize = 16 * 1024;
@@ -28,10 +26,10 @@ class SSLEndpoint : public grpc_exp::EventEngine::Endpoint,
     grpc_exp::EventEngine::ResolvedAddress peer_addr_;
     grpc_exp::EventEngine::ResolvedAddress local_addr_;
 
-    // Internal helpers to handle logic without mutex contention
-    void DoRead(absl::AnyInvocable<void(absl::Status)> on_read,
+    /// Returns true if the completion callback was invoked before return (sync).
+    bool DoRead(absl::AnyInvocable<void(absl::Status)> on_read,
                 grpc_exp::SliceBuffer* buffer);
-    void DoWrite(absl::AnyInvocable<void(absl::Status)> on_write,
+    bool DoWrite(absl::AnyInvocable<void(absl::Status)> on_write,
                  grpc_exp::SliceBuffer* data);
 
 public:
