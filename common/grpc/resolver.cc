@@ -8,6 +8,7 @@
 #include <core/util/uri.h>
 #include <core/lib/address_utils/parse_address.h>
 #include <core/config/core_configuration.h>
+#include <core/resolver/endpoint_addresses.h>
 
 #include <net.pb.h>
 #include <peer/message.h>
@@ -131,14 +132,13 @@ void NodeResolver::FinishResolution() {
     // SetObject automatically handles the Ref(), Unref(), and Cmp functions!
     grpc_core::ChannelArgs result_args = channel_args_.SetObject(std::move(hole_punch_arg));
 
-    // 4. Attach args to the Address
-    std::vector<grpc_core::ServerAddress> addresses;
-    addresses.emplace_back(addr, result_args);
+    // 4. Attach args to the endpoint address list (modern EndpointAddresses API)
+    grpc_core::EndpointAddressesList endpoints;
+    endpoints.emplace_back(std::vector<grpc_resolved_address>{addr}, result_args);
 
     // 5. Create and Report Result
     grpc_core::Resolver::Result result;
-    result.addresses = std::move(addresses);
-    result.service_config = absl::OkStatus();
+    result.addresses = std::move(endpoints);
 
     result_handler_->ReportResult(std::move(result));
 }

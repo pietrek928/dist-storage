@@ -1,6 +1,6 @@
 # AGENTS.md — dist-storage
 
-**Pointers:** [README.md](README.md) (overview + doc index) · Cursor always-on rule [`.cursor/rules/agents-md.mdc`](.cursor/rules/agents-md.mdc) (points here) · **Remaining gaps/problems:** [`docs/known-gaps.md`](docs/known-gaps.md) (canonical backlog — update that file when you find or fix issues; do not only mention them in chat).
+**Pointers:** [README.md](README.md) (overview + doc index) · Cursor always-on rule [`.cursor/rules/agents-md.mdc`](.cursor/rules/agents-md.mdc) (points here) · **Remaining gaps only:** [`docs/known-gaps.md`](docs/known-gaps.md) (unresolved backlog — remove entries when fixed; do not park “done” notes there) · **Completed / dep bumps:** [`docs/CHANGELOG.md`](docs/CHANGELOG.md).
 
 Instructions for AI coding agents (and humans) working in this repo. This project uses **C++**, **gRPC**, **Protobuf**, and **OpenSSL**. Keep entries **short and actionable**; split deep docs into focused files when they grow past ~400–500 lines.
 
@@ -72,7 +72,7 @@ Defined in [`common/utils/guard_ptr.h`](common/utils/guard_ptr.h).
 - **Plans**: If the user attaches a plan and says **do not edit the plan file**, respect that; implement in code only.
 - **Execution**: Prefer running builds/tests in the environment rather than only suggesting commands—this repo is set up for local builds.
 - **Rules**: Project-specific guardrails may also live in `.cursor/rules/` or user rules; avoid duplicating long prose here—**point to files** instead of copying whole policies.
-- **Known gaps**: Track unfinished work and known bugs in [`docs/known-gaps.md`](docs/known-gaps.md). Add new findings there; remove or update entries when fixed.
+- **Known gaps vs changelog**: [`docs/known-gaps.md`](docs/known-gaps.md) is **remaining problems only** — add findings, delete when fixed. Put resolved work, upgrades, and “no regression” notes in [`docs/CHANGELOG.md`](docs/CHANGELOG.md), not in known-gaps.
 
 ---
 

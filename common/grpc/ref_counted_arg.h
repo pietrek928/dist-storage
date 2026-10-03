@@ -2,7 +2,7 @@
 
 #include <string_view>
 
-#include <grpc/impl/codegen/grpc_types.h>
+#include <grpc/grpc.h>
 #include <core/util/ref_counted.h>
 #include <core/util/ref_counted_ptr.h>
 

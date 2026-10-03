@@ -1,9 +1,9 @@
 # Known gaps and problems
 
-Living list of unfinished product surface, correctness gaps, and known sharp edges.
-Prefer fixing items here over rediscovering them in chat. When you close a gap, **delete or rewrite the bullet** in this file.
+Living backlog of **unresolved** product gaps, correctness issues, and sharp edges.
+When you close a gap, **remove it from this file** and record the fix in [`CHANGELOG.md`](CHANGELOG.md) if it is worth noting. Do not leave “done” items here.
 
-Agents: see [AGENTS.md](../AGENTS.md) — this document is the canonical backlog of remaining gaps/problems.
+Agents: see [AGENTS.md](../AGENTS.md).
 
 ---
 
@@ -20,6 +20,7 @@ Agents: see [AGENTS.md](../AGENTS.md) — this document is the canonical backlog
 | No client channel wiring for `node://` | factory + channel builders | `RegisterNodeResolver()` is not called from minions; no `makeRefCountedArg` stub injection for the signaling Message stub. |
 | Duplicate port reservation | `StartLocked` vs `StartHolePunching` | Both can bind a random port; logic is split and easy to desync. |
 | Unused `GRPCCounterHandler` | [`callback.h`](../common/grpc/callback.h) | No in-repo callers; keep or remove deliberately. |
+| EE hole-punch arg is string-key `void*` | [`engine.cc`](../common/grpc/engine.cc) `Connect` | Public `EndpointConfig` has no typed `GetObject` (only Int/String/void*). Resolver uses `ChannelArgs::SetObject`; EE must look up via `GetVoidPointer("grpc.custom.hole_punch_params")`. |
 
 ---
 
@@ -27,3 +28,4 @@ Agents: see [AGENTS.md](../AGENTS.md) — this document is the canonical backlog
 
 - Hole-punch config (port ranges, timers) should be shared between resolver and [`message_send.cc`](../minion/message/message_send.cc) rather than copy-pasted TODOs.
 - `HolePunchEventEngine` holds a non-owning `SSL_CTX*`; safe only while the caller’s `SSL_CTX_ptr` outlives the engine (current `message_server` pattern).
+- Including `grpcpp/grpcpp.h` can surface **upstream** deprecation warnings in gRPC TLS headers (`IdentityKeyCertPair`, etc.) — not our call sites; do not silence with `-Wno-deprecated` in project code.
