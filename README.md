@@ -109,4 +109,5 @@ Some binaries require runtime configuration/arguments depending on your setup.
 ## Documentation
 
 - **[AGENTS.md](AGENTS.md)**: project conventions, pitfalls, and contributor/agent guidance.
+- **[docs/known-gaps.md](docs/known-gaps.md)**: remaining gaps and known problems (backlog).
 - Module-specific docs/comments are kept near their code.
