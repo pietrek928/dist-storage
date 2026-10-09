@@ -9,8 +9,9 @@ message ResourceEventFilter {
     repeated string resourceKeyPrefixes = 1;
     int64 startTimestamp_s = 2;
     int64 endTimestamp_s = 3;
-    repeated bytes billerIds = 4;
-    repeated bytes limitIds = 5;
+    repeated string billingKeys = 4;
+    repeated string limitKeys = 5;
+    repeated bytes billerIds = 6;
 };
 
 message ResourceEvent {
@@ -18,8 +19,9 @@ message ResourceEvent {
   string resourceKey = 2;
   int64 timestamp_s = 3;
   double amount = 4;
-  repeated bytes billerIds = 5;
-  repeated bytes limitIds = 6;
+  repeated string billingKeys = 5;
+  repeated string limitKeys = 6;
+  bytes billerId = 7;
 };
 
 message AppendRequest { repeated ResourceEvent events = 1; };

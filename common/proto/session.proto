@@ -1,0 +1,33 @@
+message SessionRequest {
+  bytes pubKey = 1;
+  repeated string roles = 2;
+  repeated string resourceKeyPrefixes = 3;
+};
+
+message SessionBillingEntry {
+  string key = 1;
+  repeated string resourceKeyPrefixes = 2;
+  int64 startTimestamp_s = 3;
+  int64 endTimestamp_s = 4;
+};
+
+message SessionLimitEntry {
+  string key = 1;
+  repeated string resourceKeyPrefixes = 2;
+  int64 startTimestamp_s = 3;
+  int64 endTimestamp_s = 4;
+};
+
+message SessionConfig {
+  bytes id = 1;
+  repeated string resourceKeyPrefixes = 2;
+  int64 startTimestamp_s = 3;
+  int64 endTimestamp_s = 4;
+  repeated SessionBillingEntry billings = 5;
+  repeated SessionLimitEntry limits = 6;
+};
+
+message SessionResult {
+  CheckSessionStatus status = 1;
+  bytes sessionCert = 2;
+};

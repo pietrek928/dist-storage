@@ -6,7 +6,7 @@ import "tel.proto";
 
 message BillEvent {
     bytes eventId = 1;
-    bytes billinId = 2;
+    string billingKey = 2;
     double amount = 3;
     int64 timestamp_s = 4;
 };
@@ -21,7 +21,7 @@ message AppendResult {
 };
 
 message GetRequest {
-    bytes billingId = 1;
+    string billingKey = 1;
     int64 timestamp_s = 2;
 };
 

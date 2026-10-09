@@ -6,7 +6,7 @@ import "tel.proto";
 
 message LimitEvent {
     bytes eventId = 1;
-    string limitId = 2;
+    string limitKey = 2;
     double amount = 3;
     int64 timestamp_s = 4;
 };
@@ -21,7 +21,7 @@ message AppendResult {
 };
 
 message GetRequest {
-    repeated string limitIds = 1;
+    repeated string limitKeys = 1;
 };
 
 message GetResponse {
@@ -29,7 +29,7 @@ message GetResponse {
 };
 
 message ResetRequest {
-    repeated string limitIds = 1;
+    repeated string limitKeys = 1;
     int64 timestamp_s = 2;
 };
 

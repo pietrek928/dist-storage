@@ -2,68 +2,44 @@ syntax = "proto3";
 
 package auth;
 
-import "resource.proto";
-
-
-enum CheckSessionStatus {
-  OK = 0;
-  UNAUTHORIZED = 1;
-  EXPIRED = 2;
-  FAILED = 3;
-};
-
-message CheckSessionRequest {
-  bytes sessionId = 1;
-};
-
-message CheckSessionResult {
-  CheckSessionStatus status = 1;
-  repeated resource.KeySet auths = 2;
-};
-
-service Auth {
-  rpc CheckSession(CheckSessionRequest) returns (CheckSessionResult);
-};
 
 message AccessGrant {
   int64 startTimestamp_s = 1;
   int64 endTimestamp_s = 2;
-  repeated string roles = 3;
+  repeated string grantToRoles = 3;
   repeated string resourceKeyPrefixes = 4;
 };
 
 message RoleMapping {
   int64 startTimestamp_s = 1;
   int64 endTimestamp_s = 2;
-  string grantTo = 3;
+  string grantToRoles = 3;
   string roles = 4;
 };
 
-message LimitEntry {
+message LimitConfig {
   string key = 1;
-  repeated string resourceKeyPrefixes = 2;
-  int64 startTimestamp_s = 3;
-  int64 endTimestamp_s = 4;
-  float accumThresh = 5;
-  float accumAlpha = 6;
-  float billingLimit = 7;
-  float billingWindow_s = 8;
+  repeated string limitedRoles = 2;
+  repeated string resourceKeyPrefixes = 3;
+  int64 startTimestamp_s = 4;
+  int64 endTimestamp_s = 5;
+  float accumThresh = 6;
+  float accumAlpha = 7;
 };
 
-message ResourceGrant {
+message BillingConfig {
+  string key = 1;
+  repeated string billedRoles = 2;
+  repeated string resourceKeyPrefixes = 3;
+  int64 startTimestamp_s = 4;
+  int64 endTimestamp_s = 5;
+  float billingLimit = 6;
+  float billingWindow_s = 7;
+};
+
+message ResourceConfig {
   repeated AccessGrant grants = 1;
   repeated RoleMapping roleMappings = 2;
-  repeated LimitEntry limits = 3;
-};
-
-message SessionRequest {
-  bytes pubKey = 1;
-  repeated string roles = 2;
-  repeated string resourceKeyPrefixes = 3;
-};
-
-message SessionResult {
-  CheckSessionStatus status = 1;
-  bytes sessionId = 2;
-  bytes sessionCert = 3;
+  repeated LimitConfig limitConfigs = 3;
+  repeated BillingConfig billingConfigs = 4;
 };
