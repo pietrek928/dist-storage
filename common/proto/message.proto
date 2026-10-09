@@ -18,7 +18,7 @@ message MessageData {
     minion.Register minion_register = 3;
     net.HolePunchParameters hole_punch = 4;
     net.IPAddr listen = 5;
-    auth.ResourceGrant resource_grant = 6;
+    auth.ResourceConfig resource_config = 6;
   };
 };
 

@@ -4,6 +4,14 @@ Notable completed work and dependency bumps. Open problems stay in [`known-gaps.
 
 ---
 
+## 2026-10-09 — planner ANTLR pin + deprecation cleanup
+
+- Confirmed / hardened planner ANTLR pin at **4.13.2** (latest stable): FetchContent runtime tag + complete JAR with SHA256, `find_package(Java)`, codegen into the build tree via `*.cpp` / `*.h` globs.
+- `query_parser_obj`: C++17, SYSTEM ANTLR includes, `-Werror=deprecated-declarations` on project TUs; dropped stale `ParserRuleContext.h` / `ANTLR4_INCLUDE_DIR` usage.
+- Unblocked proto build after the resource/auth reshape: unused `resource.proto` import in `holder/obj.proto`, `message.proto` → `auth.ResourceConfig`, completed `session.proto` syntax/package.
+
+---
+
 ## 2026-10-03 — gRPC / protobuf stack upgrade
 
 - Bumped FetchContent pins: **gRPC v1.84.0** (recursive submodules), **GoogleTest v1.18.0**.

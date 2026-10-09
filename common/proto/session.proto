@@ -1,3 +1,13 @@
+syntax = "proto3";
+
+package session;
+
+enum SessionRequestStatus {
+  OK = 0;
+  FAILED = 1;
+  NOT_AUTHORIZED = 2;
+};
+
 message SessionRequest {
   bytes pubKey = 1;
   repeated string roles = 2;
@@ -28,6 +38,6 @@ message SessionConfig {
 };
 
 message SessionResult {
-  CheckSessionStatus status = 1;
+  SessionRequestStatus status = 1;
   bytes sessionCert = 2;
 };

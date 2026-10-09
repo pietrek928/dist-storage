@@ -1,24 +1,21 @@
 #include "parse_query.h"
 
+#include <algorithm>
 #include <any>
+#include <cctype>
 #include <initializer_list>
-#include <string>
-#include <cctype> // For std::isxdigit
 #include <iostream>
+#include <string>
+#include <vector>
 
-#include "../query/graph.h"
-#include "ParserRuleContext.h"
+#include "query/graph.h"
 #include "data.pb.h"
 #include "query.pb.h"
 
-// ANTLR Runtime header
 #include <antlr4-runtime.h>
-
-// Your generated headers
+#include <sqlBaseVisitor.h>
 #include <sqlLexer.h>
 #include <sqlParser.h>
-#include <sqlBaseVisitor.h> // The base visitor class ANTLR generated for you
-#include <vector>
 
 using namespace antlr4;
 

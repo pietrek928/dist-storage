@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package holder.obj;
 
-import "resource.proto";
 import "tel.proto";
 
 enum HashType {
